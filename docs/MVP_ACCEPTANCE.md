@@ -104,17 +104,18 @@ archived_path_or_sha256, auditor_result, auditor_note
 | AC1 公司与证券主表 | PASS | 无结构性阻断；仍需验收时人工抽查交易所映射 |
 | AC2 关系可追溯 | PASS | 10 条关系均有原始披露定位、本地归档、SHA-256；固定种子抽查 `10/10 PASS` |
 | AC3 30 家四层范围 | PASS | 已冻结为 30 家、四层 |
-| AC4 三个投资问题 | FAIL | Q2 可部分回答；CapEx 事件传导和预期/价格比较尚未形成完整数据闭环 |
-| AC5 五个重复输出 | FAIL | 当前只能生成产业链初始表，另外四类输出和统一构建命令尚未完成 |
+| AC4 三个投资问题 | IMPLEMENTED — REVIEW PENDING | 固定 fixture 已验证 event_id、证据规则、Q3 可比较性、as-of 和未来数据排除；等待 GitHub CI 与 domain review |
+| AC5 五个重复输出 | IMPLEMENTED — REVIEW PENDING | 非破坏性 `ai-chain build` 已生成五个输出并验证 edge-level、删除重建、哈希和失败注入；等待 GitHub CI 与 domain review |
 
-因此当前项目状态是：**MVP NOT ACCEPTED**。
+因此当前项目状态是：**MVP ACCEPTANCE PENDING DOMAIN REVIEW**。冻结合同没有降低；最终 PASS 需新 SHA 的 `research-ci` 成功并通过 domain review。
 
 AC2 可重复验收命令：
 
 ```bash
-uv run ai-chain init
+uv run ai-chain init-seed
 uv run ai-chain trace-audit
-uv run ai-chain acceptance
+uv run ai-chain build --as-of 2026-07-19
+uv run ai-chain acceptance --as-of 2026-07-19
 ```
 
 抽查明细输出为 `outputs/mvp/relation_trace_sample.csv`。哈希不一致、归档缺失、来源与关系不匹配或人工结果非 `PASS` 时，AC2 立即失败。

@@ -20,6 +20,12 @@ SEEDS = {
     "source_evidence": "source_evidence.csv",
     "hypotheses": "hypotheses.csv",
     "company_exposures": "company_exposures.csv",
+    "company_exposure_evidence": "company_exposure_evidence.csv",
+    "capex_events": "capex_events.csv",
+    "fundamental_signals": "fundamental_signals.csv",
+    "expectation_signals": "expectation_signals.csv",
+    "price_signals": "price_signals.csv",
+    "valuation_signals": "valuation_signals.csv",
 }
 
 
@@ -37,7 +43,57 @@ def _read_csv(path: Path) -> tuple[list[str], list[tuple[object, ...]]]:
     return reader.fieldnames, rows
 
 
-def initialize(path: Path = DEFAULT_DB_PATH) -> dict[str, int]:
+def _backfill_temporal_fields(connection: duckdb.DuckDBPyConnection) -> None:
+    end_of_day = "INTERVAL '23 hours 59 minutes 59 seconds'"
+    connection.execute(
+        f"""UPDATE sources
+            SET first_available_at = CAST(disclosed_at AS TIMESTAMP) AT TIME ZONE 'UTC' + {end_of_day},
+                ingested_at = CAST(accessed_at AS TIMESTAMP) AT TIME ZONE 'UTC' + {end_of_day},
+                revision_id = 'v1'
+            WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL"""
+    )
+    connection.execute(
+        f"""UPDATE company_research_snapshot r
+            SET first_available_at = greatest(
+                    s.first_available_at,
+                    CAST(r.as_of_date AS TIMESTAMP) AT TIME ZONE 'UTC' + {end_of_day}
+                ),
+                ingested_at = greatest(
+                    s.ingested_at,
+                    CAST(r.as_of_date AS TIMESTAMP) AT TIME ZONE 'UTC' + {end_of_day}
+                ),
+                revision_id = 'v1'
+            FROM sources s
+            WHERE r.source_id=s.source_id
+              AND (r.first_available_at IS NULL OR r.ingested_at IS NULL OR r.revision_id IS NULL)"""
+    )
+    connection.execute(
+        """UPDATE supply_chain_edges e
+            SET first_available_at=s.first_available_at,
+                ingested_at=s.ingested_at,
+                revision_id='v1'
+            FROM sources s
+            WHERE e.source_id=s.source_id
+              AND (e.first_available_at IS NULL OR e.ingested_at IS NULL OR e.revision_id IS NULL)"""
+    )
+    connection.execute(
+        f"""UPDATE company_exposures e
+            SET first_available_at=coalesce(
+                    s.first_available_at,
+                    CAST(e.as_of_date AS TIMESTAMP) AT TIME ZONE 'UTC' + {end_of_day}
+                ),
+                ingested_at=coalesce(
+                    s.ingested_at,
+                    CAST(e.as_of_date AS TIMESTAMP) AT TIME ZONE 'UTC' + {end_of_day}
+                ),
+                revision_id='v1'
+            FROM sources s
+            WHERE e.source_id=s.source_id
+              AND (e.first_available_at IS NULL OR e.ingested_at IS NULL OR e.revision_id IS NULL)"""
+    )
+
+
+def initialize_seed(path: Path = DEFAULT_DB_PATH) -> dict[str, int]:
     connection = connect(path)
     try:
         connection.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -53,6 +109,7 @@ def initialize(path: Path = DEFAULT_DB_PATH) -> dict[str, int]:
                     f"INSERT INTO {table} ({column_sql}) VALUES ({placeholders})", rows
                 )
             counts[table] = len(rows)
+        _backfill_temporal_fields(connection)
         connection.execute("COMMIT")
         return counts
     except Exception:
@@ -60,3 +117,6 @@ def initialize(path: Path = DEFAULT_DB_PATH) -> dict[str, int]:
         raise
     finally:
         connection.close()
+
+
+initialize = initialize_seed

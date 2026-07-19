@@ -1,0 +1,1 @@
+evidence_id,company_id,evidence_type,product,customer_name,customer_type,metric_name,metric_value,unit,fiscal_period,evidence_start,evidence_end,source_id,source_locator,first_available_at,ingested_at,revision_id,superseded_at,confidence

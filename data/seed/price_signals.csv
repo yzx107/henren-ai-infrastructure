@@ -1,0 +1,1 @@
+signal_id,security_id,snapshot_at,window_start,window_end,return_type,raw_return,benchmark_return,excess_return,benchmark_id,source_id,first_available_at,ingested_at,revision_id,superseded_at
