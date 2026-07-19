@@ -60,7 +60,11 @@ supply_chain_master.csv          c199f52f0a2626aeb8fe6fba96d725024be549fb863338f
 - 固定 Python：`3.12`。
 - 输出 artifact：`research-output-2026-07-19`。
 - 日志 artifact：`research-ci-logs`。
-- 当前状态：尚未 push 新 SHA，因此远端 run 尚未产生。
+- 实现 SHA：`d1cdf2a077955f4eb0f4a53dcae4634268217f23`。
+- `research-ci`：PASS。
+- Workflow run：`https://github.com/yzx107/henren-ai-infrastructure/actions/runs/29691996792`。
+- 已核验 artifacts：`research-output-2026-07-19`、`research-ci-logs`。
+- 本状态文档提交后会触发最终 head 的第二次 CI；以 PR #1 最新 check 为最终准据。
 
 ## 已知限制
 
