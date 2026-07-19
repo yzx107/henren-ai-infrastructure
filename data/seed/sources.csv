@@ -1,0 +1,39 @@
+source_id,title,publisher,source_type,url,disclosed_at,accessed_at
+S_MSFT,Microsoft FY2026 Q3 earnings call,Microsoft,earnings_call,https://www.microsoft.com/en-us/investor/events/fy-2026/earnings-fy-2026-q3,2026-04-29,2026-07-19
+S_GOOG,Alphabet 2025 Q4 earnings call,Alphabet,earnings_call,https://abc.xyz/investor/events/event-details/2026/2025-Q4-Earnings-Call-2026-Dr_C033hS6/default.aspx,2026-02-04,2026-07-19
+S_AMZN,Amazon Q1 2026 results,Amazon,earnings_release,https://ir.aboutamazon.com/news-release/news-release-details/2026/Amazon-com-Announces-First-Quarter-Results/default.aspx,2026-04-29,2026-07-19
+S_META,Meta Q1 2026 results,Meta Platforms,earnings_release,https://investor.atmeta.com/investor-news/press-release-details/2026/Meta-Reports-First-Quarter-2026-Results/default.aspx,2026-04-29,2026-07-19
+S_ORCL,Oracle Q4 and FY2026 results,Oracle,earnings_release,https://investor.oracle.com/investor-news/news-details/2026/Oracle-Announces-Record-Q4-and-FY-2026-Results-Driven-by-Cloud-Infrastructure--Cloud-Applications/,2026-06-15,2026-07-19
+S_NVDA,NVIDIA Q1 FY2027 results,NVIDIA,earnings_release,https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-First-Quarter-Fiscal-2027/default.aspx,2026-05-20,2026-07-19
+S_AMD,AMD Q1 2026 results,AMD,earnings_release,https://ir.amd.com/news-events/press-releases/detail/1284/amd-reports-first-quarter-2026-financial-results,2026-05-05,2026-07-19
+S_AVGO,Broadcom Q2 FY2026 results,Broadcom,earnings_release,https://investors.broadcom.com/news-releases/news-release-details/broadcom-inc-announces-second-quarter-fiscal-year-2026-financial,2026-06-03,2026-07-19
+S_MRVL,Marvell Q1 FY2027 results,Marvell Technology,earnings_release,https://investor.marvell.com/news-events/press-releases/detail/1023/marvell-technology-inc-reports-first-quarter-of-fiscal-year-2027-financial-results,2026-05-28,2026-07-19
+S_INTC,Intel Q1 2026 results,Intel,earnings_release,https://www.intc.com/news-events/press-releases/detail/1767/intel-reports-first-quarter-2026-financial-results,2026-04-23,2026-07-19
+S_TSMC,TSMC Q1 2026 earnings call transcript,TSMC,earnings_call,https://investor.tsmc.com/english/encrypt/files/encrypt_file/reports/2026-04/3cef85204275f94fd111485cfdf4adb3c0263c45/TSMC%201Q26%20Transcript.pdf,2026-04-16,2026-07-19
+S_SKHYNIX,SK hynix ships HBM4E samples,SK hynix,press_release,https://news.skhynix.com/12-layer-hbm4e-sample/,2026-06-18,2026-07-19
+S_SAMSUNG,Samsung Electronics Q1 2026 results,Samsung Electronics,earnings_release,https://news.samsung.com/global/samsung-electronics-announces-first-quarter-2026-results,2026-04-30,2026-07-19
+S_MICRON,Micron Q3 FY2026 results,Micron Technology,earnings_release,https://investors.micron.com/node/50671,2026-06-24,2026-07-19
+S_ASE,ASE launches automated panel-level packaging for AI,ASE,press_release,https://ase.aseglobal.com/press-room/310x310/,2026-05-26,2026-07-19
+S_AMKOR,Amkor Q1 2026 results,Amkor Technology,earnings_release,https://ir.amkor.com/news-releases/news-release-details/amkor-technology-reports-financial-results-first-quarter-2026,2026-04-27,2026-07-19
+S_IBIDEN,IBIDEN high-performance IC package substrate investment,IBIDEN,press_release,https://www.ibiden.com/company/2026/02/notice-regarding-capital-investment-plan-for-high-performance-ic-package-substrates.html,2026-02-03,2026-07-19
+S_ARISTA,Arista Q1 2026 results,Arista Networks,earnings_release,https://investors.arista.com/Communications/Press-Releases-and-Events/Press-Release-Detail/2026/Arista-Networks-Inc--Reports-First-Quarter-2026-Financial-Results/default.aspx,2026-05-05,2026-07-19
+S_CISCO,Cisco Q3 FY2026 results,Cisco Systems,earnings_release,https://investor.cisco.com/news/news-details/2026/CISCO-REPORTS-THIRD-QUARTER-EARNINGS/default.aspx,2026-05-13,2026-07-19
+S_CREDO,Credo Q4 and FY2026 results,Credo Technology,earnings_release,https://investors.credosemi.com/news-events/news/news-details/2026/Credo-Technology-Group-Holding-Ltd-Reports-Fourth-Quarter-and-Fiscal-Year-2026-Financial-Results/default.aspx,2026-06-01,2026-07-19
+S_ASTERA,Astera Labs Q1 2026 results,Astera Labs,earnings_release,https://ir.asteralabs.com/news-releases/news-release-details/astera-labs-reports-first-quarter-2026-financial-results,2026-05-05,2026-07-19
+S_COHERENT,Coherent next-generation pluggable transceivers at OFC 2026,Coherent,press_release,https://www.coherent.com/news/press-releases/coherent-demonstrates-next-gen-pluggable-transceiver-ofc-2026,2026-03-17,2026-07-19
+S_LUMENTUM,Lumentum AI infrastructure products at OFC 2026,Lumentum,press_release,https://investor.lumentum.com/financial-news-releases/news-details/2026/Lumentum-Demonstrates-Industry-Leading-Technologies-and-Products-for-Scale-Out-Scale-Up-and-Scale-Across-AI-Infrastructure-at-OFC-2026/default.aspx,2026-03-17,2026-07-19
+S_CIENA,Ciena Q2 FY2026 results,Ciena,earnings_release,https://investor.ciena.com/news/news-details/2026/Ciena-Reports-Fiscal-Second-Quarter-2026-Financial-Results/default.aspx,2026-06-04,2026-07-19
+S_FABRINET,Fabrinet Q3 FY2026 results,Fabrinet,earnings_release,https://investor.fabrinet.com/news-releases/news-release-details/fabrinet-announces-third-quarter-fiscal-year-2026-financial,2026-05-04,2026-07-19
+S_INNOLIGHT,中际旭创投资者关系与定期报告,中际旭创,company_ir,https://www.zj-innolight.com/index/index/inv2.html,2026-04-20,2026-07-19
+S_EOPTOLINK,新易盛2025年年度报告,深圳证券交易所,annual_report,https://disc.static.szse.cn/disc/disk03/finalpage/2026-04-24/e20c68b8-9ce5-4751-acfd-9fb5f4e44645.PDF,2026-04-24,2026-07-19
+S_ACCELINK,光迅科技投资者关系与2025年年度报告,光迅科技,company_ir,https://www.accelink.com/lighting_your_dreams/touzizheguanxi.html,2026-04-23,2026-07-19
+S_ZTE,中兴通讯2025年度业绩,中兴通讯,earnings_release,https://www.zte.com.cn/global/about/news/ZTE-Reports-2025-Revenue-of-RMB-133-90-Billion-Advancing-Full-stack-AI-Capabilities.html,2026-03-06,2026-07-19
+S_YOFC,长飞光纤光缆2025年年度报告,香港交易所,annual_report,https://www.hkexnews.hk/listedco/listconews/sehk/2026/0327/2026032703338_c.pdf,2026-03-27,2026-07-19
+S_EDGE_AMD_META,AMD and Meta announce 6-gigawatt agreement,AMD,press_release,https://ir.amd.com/financial-information/sec-filings/content/0000002488-26-000045/pressreleasedatedfebruary2.htm,2026-02-24,2026-07-19
+S_EDGE_NVDA_COHERENT,NVIDIA and Coherent strategic optics partnership,Coherent,press_release,https://www.coherent.com/news/press-releases/nvidia-and-coherent-announce-strategic-partnership,2026-03-02,2026-07-19
+S_EDGE_SK_NVDA,NVIDIA and SK hynix multiyear memory partnership,NVIDIA,press_release,https://nvidianews.nvidia.com/news/sk-hynix-ai-factory,2026-06-07,2026-07-19
+S_EDGE_SAMSUNG_AMD,Samsung and AMD AI memory collaboration,Samsung Electronics,press_release,https://news.samsung.com/global/samsung-and-amd-expand-strategic-collaboration-on-next-generation-ai-memory-solutions,2026-03-18,2026-07-19
+S_EDGE_COHERENT_MRVL,Coherent 1.6T transceiver with Marvell DSP,Coherent,press_release,https://www.coherent.com/news/press-releases/silicon-photonics-based-transceiver-modules,2025-03-31,2026-07-19
+S_EDGE_AMKOR_TSMC,Amkor and TSMC advanced packaging partnership in Arizona,TSMC,press_release,https://pr.tsmc.com/english/news/3174,2024-10-04,2026-07-19
+S_EDGE_AMD_TSMC,AMD ramps EPYC Venice production on TSMC 2nm,AMD,press_release,https://ir.amd.com/news-events/press-releases/detail/1287/amd-announces-production-ramp-of-next-generation-amd-epyc-processor-venice-on-tsmc-2nm-process-technology,2026-05-21,2026-07-19
+S_EDGE_NVDA_LUMENTUM,NVIDIA and Lumentum strategic optics partnership,Lumentum,press_release,https://investor.lumentum.com/financial-news-releases/news-details/2026/NVIDIA-Announces-Strategic-Partnership-With-Lumentum-to-Develop-State-of-the-Art-Optics-Technology/default.aspx,2026-03-02,2026-07-19

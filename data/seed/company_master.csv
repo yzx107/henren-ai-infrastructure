@@ -1,0 +1,32 @@
+company_id,company_name,country,industry_layer,primary_business,fiscal_year_end
+CLOUD_MSFT,Microsoft,美国,云厂商,Azure 云与 AI 基础设施,06-30
+CLOUD_GOOG,Alphabet,美国,云厂商,Google Cloud 与自研 TPU,12-31
+CLOUD_AMZN,Amazon,美国,云厂商,AWS 与 Trainium/Graviton 自研芯片,12-31
+CLOUD_META,Meta Platforms,美国,云厂商,广告平台与自建 AI 基础设施,12-31
+CLOUD_ORCL,Oracle,美国,云厂商,Oracle Cloud Infrastructure,05-31
+CHIP_NVDA,NVIDIA,美国,GPU/ASIC,数据中心 GPU 与网络平台,01-last-Sunday
+CHIP_AMD,Advanced Micro Devices,美国,GPU/ASIC,Instinct GPU 与 EPYC CPU,12-last-Saturday
+CHIP_AVGO,Broadcom,美国,GPU/ASIC,定制 AI 加速器与交换芯片,10-last-Sunday
+CHIP_MRVL,Marvell Technology,美国,GPU/ASIC,定制 XPU 与数据中心互联芯片,01/02-Saturday
+CHIP_INTC,Intel,美国,GPU/ASIC,数据中心 CPU 与 AI 加速器,12-last-Saturday
+MEM_TSMC,TSMC,中国台湾,HBM与先进封装,先进制程晶圆代工与 CoWoS,12-31
+MEM_SKHYNIX,SK hynix,韩国,HBM与先进封装,HBM 与服务器 DRAM,12-31
+MEM_SAMSUNG,Samsung Electronics,韩国,HBM与先进封装,HBM DRAM 与晶圆代工,12-31
+MEM_MICRON,Micron Technology,美国,HBM与先进封装,HBM DRAM 与数据中心存储,08-last-Thursday
+PKG_ASE,ASE Technology Holding,中国台湾,HBM与先进封装,半导体封装测试与先进封装,12-31
+PKG_AMKOR,Amkor Technology,美国,HBM与先进封装,外包半导体封装与测试,12-31
+PKG_IBIDEN,IBIDEN,日本,HBM与先进封装,高性能 IC 封装基板,03-31
+NET_ARISTA,Arista Networks,美国,网络与光互联,AI 数据中心以太网交换机,12-31
+NET_CISCO,Cisco Systems,美国,网络与光互联,交换系统 Silicon One 与光学器件,07-last-Saturday
+NET_CREDO,Credo Technology,开曼群岛,网络与光互联,SerDes AEC 与光互联芯片,04/05-Saturday
+NET_ASTERA,Astera Labs,美国,网络与光互联,PCIe/CXL 连接芯片与 Fabric 交换,12-31
+OPT_COHERENT,Coherent,美国,网络与光互联,高速光模块 激光器与 InP 器件,06-30
+OPT_LUMENTUM,Lumentum Holdings,美国,网络与光互联,EML/CW 激光器与光模块,06-last-Saturday
+OPT_CIENA,Ciena,美国,网络与光互联,数据中心互联与光传输系统,10-last-Saturday
+OPT_FABRINET,Fabrinet,开曼群岛,网络与光互联,光通信精密制造与封装,06-last-Friday
+OPT_INNOLIGHT,中际旭创,中国,网络与光互联,800G/1.6T 高速光模块,12-31
+OPT_EOPTOLINK,新易盛,中国,网络与光互联,高速率光模块,12-31
+OPT_ACCELINK,光迅科技,中国,网络与光互联,光芯片 器件与高速光模块,12-31
+NET_ZTE,中兴通讯,中国,网络与光互联,数据中心交换与光网络设备,12-31
+OPT_YOFC,长飞光纤光缆,中国,网络与光互联,光纤光缆与数据中心光互联,12-31
+

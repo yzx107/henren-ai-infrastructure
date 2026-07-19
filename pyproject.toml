@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "henren-ai-infrastructure-graph"
+version = "0.1.0"
+description = "Auditable AI infrastructure supply-chain research database"
+requires-python = ">=3.11"
+dependencies = ["duckdb>=1.4,<2"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+ai-chain = "ai_chain.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_chain"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

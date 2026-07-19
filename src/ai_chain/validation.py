@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+from datetime import date
+
+import duckdb
+
+from .audit import evidence_failures
+
+
+ALLOWED_LAYERS = {"云厂商", "GPU/ASIC", "HBM与先进封装", "网络与光互联"}
+ALLOWED_EXPOSURES = {"直接-高", "直接-中", "直接-低", "间接", "待核验"}
+MARKET_CURRENCIES = {"A": "CNY", "H": "HKD", "US": "USD"}
+
+
+def validate(connection: duckdb.DuckDBPyConnection, as_of: date) -> list[str]:
+    issues: list[str] = []
+
+    company_count = connection.execute("SELECT count(*) FROM company_master").fetchone()[0]
+    if company_count != 30:
+        issues.append(f"首批公司必须恰好 30 家，当前为 {company_count} 家")
+
+    layers = {
+        row[0]
+        for row in connection.execute(
+            "SELECT DISTINCT industry_layer FROM company_master"
+        ).fetchall()
+    }
+    if layers != ALLOWED_LAYERS:
+        issues.append(f"产业层级不匹配：{sorted(layers)}")
+
+    missing_security = connection.execute(
+        """SELECT company_id FROM company_master
+           WHERE company_id NOT IN (SELECT company_id FROM security_master)"""
+    ).fetchall()
+    if missing_security:
+        issues.append(f"缺少证券映射：{[row[0] for row in missing_security]}")
+
+    bad_primary = connection.execute(
+        """SELECT company_id FROM security_master GROUP BY company_id
+           HAVING count(*) FILTER (WHERE is_primary) <> 1"""
+    ).fetchall()
+    if bad_primary:
+        issues.append(f"主证券数量异常：{[row[0] for row in bad_primary]}")
+
+    bad_currency = []
+    for market, currency in MARKET_CURRENCIES.items():
+        bad_currency.extend(
+            row[0]
+            for row in connection.execute(
+                "SELECT security_id FROM security_master WHERE market=? AND currency<>?",
+                [market, currency],
+            ).fetchall()
+        )
+    if bad_currency:
+        issues.append(f"市场币种不一致：{bad_currency}")
+
+    missing_snapshot = connection.execute(
+        """SELECT company_id FROM company_master
+           WHERE company_id NOT IN (SELECT company_id FROM company_research_snapshot)"""
+    ).fetchall()
+    if missing_snapshot:
+        issues.append(f"缺少研究快照：{[row[0] for row in missing_snapshot]}")
+
+    bad_sources = connection.execute(
+        "SELECT source_id FROM sources WHERE url NOT LIKE 'https://%' OR disclosed_at > accessed_at"
+    ).fetchall()
+    if bad_sources:
+        issues.append(f"来源 URL 或日期异常：{[row[0] for row in bad_sources]}")
+
+    future_rows = connection.execute(
+        """SELECT company_id FROM company_research_snapshot WHERE as_of_date > ?
+           UNION ALL SELECT source_id FROM sources WHERE disclosed_at > ?""",
+        [as_of, as_of],
+    ).fetchall()
+    if future_rows:
+        issues.append(f"存在未来数据：{[row[0] for row in future_rows]}")
+
+    bad_confidence = connection.execute(
+        """SELECT company_id FROM company_research_snapshot WHERE confidence NOT BETWEEN 0 AND 1
+           UNION ALL SELECT edge_id FROM supply_chain_edges WHERE confidence NOT BETWEEN 0 AND 1"""
+    ).fetchall()
+    if bad_confidence:
+        issues.append(f"置信度越界：{[row[0] for row in bad_confidence]}")
+
+    exposures = {
+        row[0]
+        for row in connection.execute(
+            "SELECT DISTINCT ai_revenue_exposure FROM company_research_snapshot"
+        ).fetchall()
+    }
+    if not exposures <= ALLOWED_EXPOSURES:
+        issues.append(f"AI 收入暴露枚举异常：{sorted(exposures - ALLOWED_EXPOSURES)}")
+
+    orphan_edges = connection.execute(
+        """SELECT edge_id FROM supply_chain_edges e
+           WHERE NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=e.source_company_id)
+              OR NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=e.target_company_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=e.source_id)"""
+    ).fetchall()
+    if orphan_edges:
+        issues.append(f"产业关系存在孤儿引用：{[row[0] for row in orphan_edges]}")
+
+    incomplete_edges = connection.execute(
+        """SELECT edge_id FROM supply_chain_edges
+           WHERE source_id IS NULL OR disclosed_at IS NULL OR valid_from IS NULL
+              OR confidence IS NULL"""
+    ).fetchall()
+    if incomplete_edges:
+        issues.append(f"产业关系缺少审计字段：{[row[0] for row in incomplete_edges]}")
+
+    edge_date_mismatch = connection.execute(
+        """SELECT e.edge_id FROM supply_chain_edges e
+           JOIN sources s USING (source_id)
+           WHERE e.disclosed_at <> s.disclosed_at"""
+    ).fetchall()
+    if edge_date_mismatch:
+        issues.append(f"关系与来源披露日期不一致：{[row[0] for row in edge_date_mismatch]}")
+
+    orphan_evidence = connection.execute(
+        """SELECT evidence_id FROM source_evidence v
+           WHERE NOT EXISTS (SELECT 1 FROM supply_chain_edges e WHERE e.edge_id=v.edge_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=v.source_id)
+              OR length(v.content_sha256) <> 64"""
+    ).fetchall()
+    if orphan_evidence:
+        issues.append(f"来源证据引用或哈希异常：{[row[0] for row in orphan_evidence]}")
+
+    archive_issues = evidence_failures(connection)
+    if archive_issues:
+        issues.append(f"来源归档校验失败：{archive_issues}")
+
+    invalid_scores = connection.execute(
+        """SELECT company_id FROM company_exposures
+           WHERE coalesce(capex_exposure, 0) NOT BETWEEN 0 AND 5
+              OR coalesce(bottleneck, 0) NOT BETWEEN 0 AND 5
+              OR coalesce(earnings_revision, 0) NOT BETWEEN 0 AND 5
+              OR coalesce(profit_capture, 0) NOT BETWEEN 0 AND 5
+              OR coalesce(priced_in, 0) NOT BETWEEN 0 AND 5"""
+    ).fetchall()
+    if invalid_scores:
+        issues.append(f"暴露评分越界：{[row[0] for row in invalid_scores]}")
+
+    return issues

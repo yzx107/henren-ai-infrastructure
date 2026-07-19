@@ -1,0 +1,12 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+runtime/*.duckdb
+runtime/*.duckdb.wal
+outputs/*
+!outputs/initial_universe.csv
+!outputs/mvp/
+outputs/mvp/*
+!outputs/mvp/relation_trace_sample.csv

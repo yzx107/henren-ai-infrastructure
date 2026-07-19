@@ -1,0 +1,33 @@
+ARCHIVED OFFICIAL DISCLOSURE TEXT SNAPSHOT
+Source URL: https://pr.tsmc.com/english/news/3174
+Publisher: TSMC and Amkor Technology Inc.
+Issued on: 2024-10-04
+Archived on: 2026-07-19
+Title: Amkor and TSMC to Expand Partnership and Collaborate on Advanced Packaging in Arizona
+
+TEMPE, Ariz. and HSINCHU, Taiwan, R.O.C. Oct. 4, 2024 – Amkor Technology, Inc.
+(Nasdaq: AMKR) and TSMC (TWSE: 2330, NYSE: TSM) announced today that the two
+companies have signed a memorandum of understanding to collaborate and bring advanced
+packaging and test capabilities to Arizona, further expanding the region's semiconductor
+ecosystem.
+
+Amkor and TSMC have been closely collaborating to deliver high volume, leading-edge
+technologies for advanced packaging and testing of semiconductors to support critical markets
+such as high-performance computing and communications. Under the agreement, TSMC will
+contract turnkey advanced packaging and test services from Amkor in their planned facility in
+Peoria, Arizona. TSMC will leverage these services to support its customers, particularly those
+using TSMC's advanced wafer fabrication facilities in Phoenix. The close collaboration and
+proximity of TSMC's front-end fab and Amkor's back-end facility will accelerate overall product
+cycle times.
+
+The companies will jointly define the specific packaging technologies, such as TSMC's
+Integrated Fan-Out (InFO) and Chip on Wafer on Substrate (CoWoS) that will be employed to
+address common customers' needs.
+
+The agreement underscores the shared commitment to supporting customer requirements for
+geographic flexibility in front-end and back-end manufacturing, as well as fostering the
+development of a vibrant and comprehensive semiconductor manufacturing ecosystem in the
+United States. The companies' shared vision is to enable seamless technology alignment for
+customers across a global manufacturing network.
+
+Source locator on official page: title and body paragraphs 1-5; web extraction lines 319-337.
