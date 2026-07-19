@@ -2,77 +2,71 @@
 
 - 状态日期：`2026-07-19`
 - 分支：`codex/p0-acceptance-pit`
-- 总体状态：`MVP ACCEPTED`（冻结合同 AC1—AC5 全部通过）
-- 公开仓库：`https://github.com/yzx107/henren-ai-infrastructure`
-- 范围未变化：30 家公司、四个产业层级、10 条关系、34 条证券映射。
+- PR：`#1 P0: enforce point-in-time acceptance gates`
+- 被 review 的旧 SHA：`f2302457c29421438fe2cf468b7278de99fb1f71`
+- 总体状态：`MVP ACCEPTANCE PENDING DOMAIN REVIEW`
+- 验收口径：`AC1—AC3 PASS；AC4—AC5 IMPLEMENTED, REVIEW PENDING`
+- 范围保持：30 家公司、四层、10 条关系、34 条证券映射。
 
-## 验收状态
+## 本轮 P0/P1 状态
 
-| 验收项 | 状态 | 执行证据 |
+| 项目 | 状态 | 证据 |
 |---|---|---|
-| AC1 公司与证券主表 | PASS | 30 家公司全部映射；主证券、市场和币种规则错误 0 |
-| AC2 关系可追溯 | PASS | 10 条关系、10 份归档证据、固定抽样 10/10、哈希错误 0 |
-| AC3 30 家四层 | PASS | 公司数和层级集合严格相等，不是下限检查 |
-| AC4 三个投资问题 | PASS | 固定数据实际执行三类查询；覆盖 as-of、直接/二级路径、来源/披露时间、暴露证据、数据不足和未来排除 |
-| AC5 五个重复输出 | PASS | 统一 build 生成五个非空输出；删除重建哈希一致；失败注入被阻断 |
+| P0-1 Q2 证据化分类 | IMPLEMENTED | `company_exposure_evidence` + `exposure-evidence-v1`；旧人工标签只作候选备注 |
+| P0-2 Q3 数据合同 | IMPLEMENTED | 同指标、期间、单位、窗口、benchmark、估值完整才返回“可比较候选（非投资结论）” |
+| P0-3 edge-level 主表 | IMPLEMENTED | `supply_chain_master.csv` 一行一条 edge，含定位、归档、哈希和审计结果 |
+| P1-1 event_id 查询 | IMPLEMENTED | `capex_beneficiaries(connection, event_id, as_of)` 不再自动选择公司最新事件 |
+| P1-2 非破坏性 build | IMPLEMENTED | `build` 只读已有数据库；只有显式 `init-seed` 重建种子库 |
+| P1-3 GitHub Actions | IMPLEMENTED, RUN PENDING | `.github/workflows/research-ci.yml`；等待新 SHA push 后远端运行 |
 
-## 本轮完成
+## 数据合同变化
 
-- 为来源、公司研究快照、产业关系和暴露评分增加 `first_available_at TIMESTAMPTZ`、`ingested_at TIMESTAMPTZ`、`revision_id`、`superseded_at`。
-- 新增带同类 PIT 字段的 `capex_events`、`fundamental_signals`、`expectation_signals`、`price_signals`。
-- 删除无 cutoff 的 `initial_universe` 和 `opportunity_scores` 静态视图，改为 `initial_universe_as_of(cutoff)`、`opportunity_scores_as_of(cutoff)` 及统一 `latest_company_research(cutoff)`。
-- `initial_universe_as_of` 每家公司只返回 cutoff 前最新的一条未失效研究快照。
-- 实现 CapEx 直接/二级传导、收入暴露分类和预期差查询。市场数据任一缺失时返回“数据不足”且不进入观察名单。
-- 实现 `uv run ai-chain build --as-of YYYY-MM-DD`，输出目录为 `outputs/research/as_of=YYYY-MM-DD/`。
-- AC4/AC5 由“对象/文件名存在”改为实际执行查询、重建、哈希比较和失败注入。
-- 测试增加空文件、仅表头、未来泄漏、多期快照去重、缺失预期/估值/价格及非零失败退出码。
+- 新增 `company_exposure_evidence`，证据类型限定为收入、收入占比、订单、积压、具名客户、出货、部署、产品、管理层陈述、间接行业暴露。
+- Q2 规则：可验证收入/订单/出货/部署证据可到 `直接-高`；仅具名客户最高 `直接-中`；仅产品或管理层陈述最高 `直接-低`；纯间接证据为 `间接`；无证据、低置信度或直接/间接冲突为 `待核验`。
+- `fundamental_signals` 增加 value/unit/fiscal/comparison/actual-or-guidance 语义。
+- `expectation_signals` 增加 forecast metric/period/unit、current/previous、明确 previous/current snapshot 窗口、revision 和 consensus source。
+- `price_signals` 增加明确窗口、收益口径、原始/benchmark/超额收益和 benchmark ID。
+- 新增 `valuation_signals`，包含估值指标、数值、forward period 和历史分位。
+- Q3 不实现 Alpha 评分；只做可比较性验证和原始字段对照。
 
-## 本次真实验证结果
-
-```text
-uv run ai-chain init                                      exit 0
-  sources=38, companies=30, securities=34, snapshots=30
-  edges=10, source_evidence=10, capex_events=3
-  fundamental/expectation/price signals=0
-
-uv run ai-chain check --as-of 2026-07-19                 exit 0
-  DQA PASS
-
-uv run ai-chain acceptance --as-of 2026-07-19            exit 0
-  AC1 PASS, AC2 PASS, AC3 PASS, AC4 PASS, AC5 PASS
-  MVP ACCEPTED
-
-uv run pytest -q                                          exit 0
-  18 passed in 3.54s
-```
-
-最终 push 前会再次从干净输出目录运行同一验证；若结果变化，以 PR 描述中的最后一次结果为准。
-
-## 统一构建与输出
-
-```bash
-uv run ai-chain build --as-of 2026-07-19
-```
-
-生成：
+## 本地真实验证
 
 ```text
-outputs/research/as_of=2026-07-19/
-  supply_chain_master.csv
-  capex_tracker.csv
-  profit_transmission.csv
-  expectation_gap_watchlist.csv
-  data_quality_report.json
+uv sync --frozen                                      exit 0
+uv run pytest -q                                      exit 0 | 32 passed in 5.04s
+uv run ai-chain init-seed                             exit 0 | 30/4/10/34 unchanged
+uv run ai-chain check --as-of 2026-07-19             exit 0 | DQA PASS
+uv run ai-chain build --as-of 2026-07-19             exit 0 | five outputs
+uv run ai-chain trace-audit                           exit 0 | 10/10 PASS
+uv run ai-chain acceptance --as-of 2026-07-19        exit 0 | AC1—AC5 implementation checks PASS
 ```
 
-五个文件必须存在、非空；四个 CSV 还必须至少有一条数据行。DQA 报告包含行数、主键重复、必填空值、孤儿引用、未来日期、币种/市场规则和关系抽查。
+CLI 最后一行是 `AC1-AC5 IMPLEMENTED; DOMAIN REVIEW PENDING`，不是最终 MVP ACCEPTED。
+
+## 输出哈希（当前本地运行）
+
+```text
+capex_tracker.csv                66dece122024bf59044af512e23ac14fb550ecea001753e7e52685722f6b9349
+data_quality_report.json         c5749aef100ba088aeee781e96f538ac4b670590466877258213589e06500e89
+expectation_gap_watchlist.csv    82f6d21e76f7ee6075f9ecdeba4187f5b81cf9d6ab2032637b0b49f0b64b4ed4
+profit_transmission.csv          8b0715382c1d52687b8a90f490105c7fddf07ba66518111f3d19868e13c96294
+supply_chain_master.csv          c199f52f0a2626aeb8fe6fba96d725024be549fb863338fbebdf4d4b1662140e
+```
+
+## GitHub CI 门槛
+
+- Workflow：`research-ci`
+- 触发：PR opened/synchronize/reopened/ready_for_review 和 workflow_dispatch。
+- 固定 Python：`3.12`。
+- 输出 artifact：`research-output-2026-07-19`。
+- 日志 artifact：`research-ci-logs`。
+- 当前状态：尚未 push 新 SHA，因此远端 run 尚未产生。
 
 ## 已知限制
 
-1. 种子数据原本只有日期；迁移将 `first_available_at` 回填为披露日 UTC 日末，将 `ingested_at` 回填为访问日 UTC 日末。它能阻止跨日未来函数，不支持日内事件研究。
-2. `revision_id` / `superseded_at` 已进入 schema 和查询闸门，但 CSV 主键仍是当前业务键；本轮没有建立完整的多修订摄取工作流。
-3. 只有 Alphabet、Microsoft、Oracle 三条 CapEx 固定事件，用于验证查询机制；没有扩大公司或关系数据。
-4. `fundamental_signals`、`expectation_signals`、`price_signals` 种子为空。利润传导和预期差输出会诚实显示“数据不足”，不会生成“未充分定价”名单。
-5. 30 条公司研究快照并非全部拥有与 10 条产业关系同等级的本地原文归档。
-6. `security_master` 仍缺逐条证券来源字段；AC1 的 PASS 是当前冻结合同的结构验收，不替代交易所层面人工抽查。
-7. DuckDB 仍是本地单进程工作流；并发写入、增量批次和正式 migration 不在本轮范围。
+1. 结构化 Q2 证据种子为空；规则由少量固定 fixture 验证。没有证据的正式公司诚实返回 `待核验`，没有为了覆盖 30 家编造证据。
+2. 财务、预期、价格和估值种子为空；Q3 正式输出为“数据不足”，完整 fixture 仅证明可比较性合同。
+3. 旧来源时间按 UTC 日末保守回填，不支持日内事件研究。
+4. `revision_id` / `superseded_at` 已进入查询，但尚无完整 immutable revision 摄取工作流。
+5. 证券映射和部分公司研究快照的证据归档弱于 10 条供应链关系。
+6. 最终 `MVP ACCEPTED` 仍需新 SHA 的 GitHub Actions 成功及 ChatGPT domain review 通过。

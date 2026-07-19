@@ -46,10 +46,10 @@ CSV 是可审计源层；DuckDB 是本地查询层。供应链关系通过 `sour
 
 ## 数据流
 
-1. `ai-chain init` 从种子 CSV 重建 DuckDB。
+1. `ai-chain init-seed` 显式从种子 CSV 重建 DuckDB；这是唯一会重置研究表的命令。
 2. `ai-chain check` 检查范围、映射、日期、来源、置信度、孤儿引用和归档哈希。
 3. `ai-chain trace-audit` 用固定种子 `mvp-v1` 生成 10 条关系抽查。
-4. `ai-chain build --as-of YYYY-MM-DD` 生成五个确定性研究输出。
+4. `ai-chain build --as-of YYYY-MM-DD` 只读已有数据库并生成五个确定性研究输出。
 5. `ai-chain acceptance --as-of YYYY-MM-DD` 实际执行三类查询、重建和失败注入。
 
 ## 主要模块
@@ -69,4 +69,4 @@ CSV 是可审计源层；DuckDB 是本地查询层。供应链关系通过 `sour
 
 ## 下一步边界
 
-当前 P0 只进入 code/data/research-logic review，不扩公司、层级、模型或界面。`QUESTIONS.md` 中未解决的投资定义和数据语义仍需投资负责人决定。
+当前 P0/P1 实现进入 GitHub CI 与 domain review，不扩公司、层级、模型或界面。CI 与 review 均通过后才能写最终 MVP ACCEPTED。

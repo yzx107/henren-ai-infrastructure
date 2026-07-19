@@ -5,11 +5,13 @@ import csv
 from datetime import date
 from pathlib import Path
 
+import duckdb
+
 from .acceptance import assess
 from .as_of import as_of_timestamp
 from .audit import evidence_failures, write_trace_sample
 from .build import BuildError, build_outputs
-from .db import DEFAULT_DB_PATH, connect, initialize
+from .db import DEFAULT_DB_PATH, connect, initialize_seed
 from .validation import validate
 
 
@@ -35,9 +37,9 @@ def _query(
         connection.close()
 
 
-def cmd_init(args: argparse.Namespace) -> int:
-    counts = initialize(args.db)
-    print(f"数据库已初始化：{args.db}")
+def cmd_init_seed(args: argparse.Namespace) -> int:
+    counts = initialize_seed(args.db)
+    print(f"种子数据库已显式重建：{args.db}")
     for table, count in counts.items():
         print(f"  {table}: {count}")
     return 0
@@ -117,17 +119,21 @@ def cmd_acceptance(args: argparse.Namespace) -> int:
         status = "PASS" if check.passed else "FAIL"
         print(f"{check.check_id} {status} | {check.title} | {check.detail}")
     accepted = all(check.passed for check in checks)
-    print("MVP ACCEPTED" if accepted else "MVP NOT ACCEPTED")
+    print(
+        "AC1-AC5 IMPLEMENTED; DOMAIN REVIEW PENDING"
+        if accepted else "MVP NOT ACCEPTED"
+    )
     return 0 if accepted else 1
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    if not args.no_init:
-        initialize(args.db)
+    if not args.db.is_file():
+        print(f"BUILD FAILED: 数据库不存在；请先运行 ai-chain init-seed（{args.db}）")
+        return 1
     connection = connect(args.db)
     try:
         output_dir, hashes = build_outputs(connection, args.as_of, args.output_root)
-    except BuildError as error:
+    except (BuildError, duckdb.Error) as error:
         print(f"BUILD FAILED: {error}")
         return 1
     finally:
@@ -157,8 +163,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="建立 DuckDB 并载入种子数据")
-    init_parser.set_defaults(func=cmd_init)
+    init_parser = subparsers.add_parser(
+        "init-seed", help="显式删除现有研究表内容并从 seed 重建 DuckDB"
+    )
+    init_parser.set_defaults(func=cmd_init_seed)
 
     check_parser = subparsers.add_parser("check", help="运行数据质量闸门")
     check_parser.add_argument("--as-of", type=date.fromisoformat, default=date.today())
@@ -184,12 +192,11 @@ def build_parser() -> argparse.ArgumentParser:
     acceptance_parser.add_argument("--as-of", type=date.fromisoformat, default=date.today())
     acceptance_parser.set_defaults(func=cmd_acceptance)
 
-    build_output = subparsers.add_parser("build", help="重建数据库并生成五个确定性研究输出")
+    build_output = subparsers.add_parser("build", help="只读现有数据库并生成五个确定性研究输出")
     build_output.add_argument("--as-of", type=date.fromisoformat, required=True)
     build_output.add_argument(
         "--output-root", type=Path, default=Path("outputs") / "research"
     )
-    build_output.add_argument("--no-init", action="store_true", help=argparse.SUPPRESS)
     build_output.set_defaults(func=cmd_build)
 
     trace_parser = subparsers.add_parser("trace-audit", help="生成并校验固定 10 条关系抽查")

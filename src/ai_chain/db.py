@@ -20,10 +20,12 @@ SEEDS = {
     "source_evidence": "source_evidence.csv",
     "hypotheses": "hypotheses.csv",
     "company_exposures": "company_exposures.csv",
+    "company_exposure_evidence": "company_exposure_evidence.csv",
     "capex_events": "capex_events.csv",
     "fundamental_signals": "fundamental_signals.csv",
     "expectation_signals": "expectation_signals.csv",
     "price_signals": "price_signals.csv",
+    "valuation_signals": "valuation_signals.csv",
 }
 
 
@@ -91,7 +93,7 @@ def _backfill_temporal_fields(connection: duckdb.DuckDBPyConnection) -> None:
     )
 
 
-def initialize(path: Path = DEFAULT_DB_PATH) -> dict[str, int]:
+def initialize_seed(path: Path = DEFAULT_DB_PATH) -> dict[str, int]:
     connection = connect(path)
     try:
         connection.execute(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -115,3 +117,6 @@ def initialize(path: Path = DEFAULT_DB_PATH) -> dict[str, int]:
         raise
     finally:
         connection.close()
+
+
+initialize = initialize_seed

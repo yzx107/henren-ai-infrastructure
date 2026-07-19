@@ -130,6 +130,28 @@ ALTER TABLE company_exposures ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMPTZ;
 ALTER TABLE company_exposures ADD COLUMN IF NOT EXISTS revision_id VARCHAR;
 ALTER TABLE company_exposures ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMPTZ;
 
+CREATE TABLE IF NOT EXISTS company_exposure_evidence (
+    evidence_id VARCHAR PRIMARY KEY,
+    company_id VARCHAR NOT NULL,
+    evidence_type VARCHAR NOT NULL,
+    product VARCHAR,
+    customer_name VARCHAR,
+    customer_type VARCHAR,
+    metric_name VARCHAR,
+    metric_value DOUBLE,
+    unit VARCHAR,
+    fiscal_period VARCHAR,
+    evidence_start DATE,
+    evidence_end DATE,
+    source_id VARCHAR NOT NULL,
+    source_locator VARCHAR NOT NULL,
+    first_available_at TIMESTAMPTZ NOT NULL,
+    ingested_at TIMESTAMPTZ NOT NULL,
+    revision_id VARCHAR NOT NULL,
+    superseded_at TIMESTAMPTZ,
+    confidence DOUBLE NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS capex_events (
     event_id VARCHAR PRIMARY KEY,
     company_id VARCHAR NOT NULL,
@@ -151,7 +173,12 @@ CREATE TABLE IF NOT EXISTS fundamental_signals (
     company_id VARCHAR NOT NULL,
     snapshot_at TIMESTAMPTZ NOT NULL,
     metric_name VARCHAR NOT NULL,
-    metric_change DOUBLE,
+    metric_value DOUBLE NOT NULL,
+    metric_unit VARCHAR NOT NULL,
+    fiscal_period VARCHAR NOT NULL,
+    comparison_type VARCHAR NOT NULL,
+    comparison_period VARCHAR NOT NULL,
+    actual_or_guidance VARCHAR NOT NULL,
     source_id VARCHAR NOT NULL,
     first_available_at TIMESTAMPTZ NOT NULL,
     ingested_at TIMESTAMPTZ NOT NULL,
@@ -159,26 +186,76 @@ CREATE TABLE IF NOT EXISTS fundamental_signals (
     superseded_at TIMESTAMPTZ
 );
 
+ALTER TABLE fundamental_signals ADD COLUMN IF NOT EXISTS metric_value DOUBLE;
+ALTER TABLE fundamental_signals ADD COLUMN IF NOT EXISTS metric_unit VARCHAR;
+ALTER TABLE fundamental_signals ADD COLUMN IF NOT EXISTS fiscal_period VARCHAR;
+ALTER TABLE fundamental_signals ADD COLUMN IF NOT EXISTS comparison_type VARCHAR;
+ALTER TABLE fundamental_signals ADD COLUMN IF NOT EXISTS comparison_period VARCHAR;
+ALTER TABLE fundamental_signals ADD COLUMN IF NOT EXISTS actual_or_guidance VARCHAR;
+
 CREATE TABLE IF NOT EXISTS expectation_signals (
     signal_id VARCHAR PRIMARY KEY,
     security_id VARCHAR NOT NULL,
     snapshot_at TIMESTAMPTZ NOT NULL,
-    revenue_revision DOUBLE,
-    eps_revision DOUBLE,
-    valuation_multiple DOUBLE,
-    source_id VARCHAR,
+    previous_snapshot_at TIMESTAMPTZ NOT NULL,
+    forecast_metric VARCHAR NOT NULL,
+    forecast_period VARCHAR NOT NULL,
+    forecast_unit VARCHAR NOT NULL,
+    current_value DOUBLE NOT NULL,
+    previous_value DOUBLE NOT NULL,
+    revision_pct DOUBLE NOT NULL,
+    consensus_source VARCHAR NOT NULL,
+    source_id VARCHAR NOT NULL,
     first_available_at TIMESTAMPTZ NOT NULL,
     ingested_at TIMESTAMPTZ NOT NULL,
     revision_id VARCHAR NOT NULL,
     superseded_at TIMESTAMPTZ
 );
 
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS forecast_metric VARCHAR;
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS previous_snapshot_at TIMESTAMPTZ;
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS forecast_period VARCHAR;
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS forecast_unit VARCHAR;
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS current_value DOUBLE;
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS previous_value DOUBLE;
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS revision_pct DOUBLE;
+ALTER TABLE expectation_signals ADD COLUMN IF NOT EXISTS consensus_source VARCHAR;
+
 CREATE TABLE IF NOT EXISTS price_signals (
     signal_id VARCHAR PRIMARY KEY,
     security_id VARCHAR NOT NULL,
     snapshot_at TIMESTAMPTZ NOT NULL,
-    price_return DOUBLE,
-    source_id VARCHAR,
+    window_start DATE NOT NULL,
+    window_end DATE NOT NULL,
+    return_type VARCHAR NOT NULL,
+    raw_return DOUBLE NOT NULL,
+    benchmark_return DOUBLE NOT NULL,
+    excess_return DOUBLE NOT NULL,
+    benchmark_id VARCHAR NOT NULL,
+    source_id VARCHAR NOT NULL,
+    first_available_at TIMESTAMPTZ NOT NULL,
+    ingested_at TIMESTAMPTZ NOT NULL,
+    revision_id VARCHAR NOT NULL,
+    superseded_at TIMESTAMPTZ
+);
+
+ALTER TABLE price_signals ADD COLUMN IF NOT EXISTS window_start DATE;
+ALTER TABLE price_signals ADD COLUMN IF NOT EXISTS window_end DATE;
+ALTER TABLE price_signals ADD COLUMN IF NOT EXISTS return_type VARCHAR;
+ALTER TABLE price_signals ADD COLUMN IF NOT EXISTS raw_return DOUBLE;
+ALTER TABLE price_signals ADD COLUMN IF NOT EXISTS benchmark_return DOUBLE;
+ALTER TABLE price_signals ADD COLUMN IF NOT EXISTS excess_return DOUBLE;
+ALTER TABLE price_signals ADD COLUMN IF NOT EXISTS benchmark_id VARCHAR;
+
+CREATE TABLE IF NOT EXISTS valuation_signals (
+    signal_id VARCHAR PRIMARY KEY,
+    security_id VARCHAR NOT NULL,
+    snapshot_at TIMESTAMPTZ NOT NULL,
+    valuation_metric VARCHAR NOT NULL,
+    valuation_value DOUBLE NOT NULL,
+    forward_period VARCHAR NOT NULL,
+    historical_percentile DOUBLE NOT NULL,
+    source_id VARCHAR NOT NULL,
     first_available_at TIMESTAMPTZ NOT NULL,
     ingested_at TIMESTAMPTZ NOT NULL,
     revision_id VARCHAR NOT NULL,

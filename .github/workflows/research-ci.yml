@@ -1,0 +1,88 @@
+name: research-ci
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Prepare logs
+        run: mkdir -p artifacts/logs
+
+      - name: Run tests
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run pytest -q 2>&1 | tee artifacts/logs/pytest.log
+
+      - name: Rebuild seed database explicitly
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run ai-chain init-seed 2>&1 | tee artifacts/logs/init-seed.log
+
+      - name: Run DQA
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run ai-chain check --as-of 2026-07-19 2>&1 | tee artifacts/logs/dqa.log
+
+      - name: Build research outputs
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run ai-chain build --as-of 2026-07-19 2>&1 | tee artifacts/logs/build.log
+
+      - name: Audit relationship evidence
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run ai-chain trace-audit 2>&1 | tee artifacts/logs/trace-audit.log
+
+      - name: Run frozen acceptance
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run ai-chain acceptance --as-of 2026-07-19 2>&1 | tee artifacts/logs/acceptance.log
+
+      - name: Upload research output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-output-2026-07-19
+          path: outputs/research/as_of=2026-07-19/
+          if-no-files-found: error
+
+      - name: Upload CI logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-ci-logs
+          path: artifacts/logs/
+          if-no-files-found: error

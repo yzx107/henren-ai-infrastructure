@@ -27,8 +27,9 @@ Git 历史从 `2026-07-19` 首次公开提交开始，因此可以 review 后续
 | `source_evidence` | 每条关系一行；原文定位、归档、SHA-256 和人工审计 |
 | `hypotheses` | 机制、最强反方、证伪条件和状态 |
 | `company_exposures` | 公司 × 截止日的五项评分输入；当前为空 |
+| `company_exposure_evidence` | Q2 结构化证据；最终暴露分类的规则输入，种子为空 |
 | `capex_events` | 固定的云厂商 CapEx 事件；当前 3 行 |
-| `fundamental_signals` / `expectation_signals` / `price_signals` | 预期差输入；种子当前为空 |
+| `fundamental_signals` / `expectation_signals` / `price_signals` / `valuation_signals` | Q3 可比较性输入；种子当前为空 |
 | `initial_universe_as_of(cutoff)` | 每家公司 cutoff 前最新有效研究快照 |
 | `opportunity_scores_as_of(cutoff)` | cutoff 前五项评分完整的公司；当前返回 0 行 |
 
@@ -69,10 +70,10 @@ Git 历史从 `2026-07-19` 首次公开提交开始，因此可以 review 后续
 在项目根目录顺序执行。以下单一 shell 命令验证当前已经完成的能力并应返回 0：
 
 ```bash
-uv run ai-chain init && uv run ai-chain check --as-of 2026-07-19 && uv run ai-chain build --as-of 2026-07-19 && uv run ai-chain trace-audit && uv run ai-chain acceptance --as-of 2026-07-19 && uv run pytest -q
+uv sync --frozen && uv run pytest -q && uv run ai-chain init-seed && uv run ai-chain check --as-of 2026-07-19 && uv run ai-chain build --as-of 2026-07-19 && uv run ai-chain trace-audit && uv run ai-chain acceptance --as-of 2026-07-19
 ```
 
-上述各命令当前预期退出码均为 `0`。同时请阅读失败型测试，确认 PASS 来自真实查询和失败注入，而非放宽合同。
+上述各命令本地预期退出码均为 `0`；当前为 `AC4—AC5 IMPLEMENTED, REVIEW PENDING`，不是最终 MVP ACCEPTED。还应查看 PR #1 的 `research-ci` 远端 run 和 artifacts。
 
 ## 三个示例查询
 
@@ -95,7 +96,7 @@ SELECT
 
 ```sql
 -- Python API 调用：
--- capex_beneficiaries(connection, 'CLOUD_GOOG', date(2026, 2, 28))
+-- capex_beneficiaries(connection, 'CAPEX_GOOG_FY2026', date(2026, 2, 28))
 SELECT company, core_product, first_available_at
 FROM initial_universe_as_of(TIMESTAMPTZ '2026-02-28 23:59:59+00:00')
 ORDER BY company;
@@ -121,8 +122,19 @@ FROM source_evidence;
 2. 10 条关系的原文是否支持关系方向、产品和经济暴露。
 3. `source_evidence` 的人工 PASS 是否过于宽松。
 4. 公司/证券映射缺乏逐条来源是否应降低 AC1 状态。
-5. 在预期、估值和价格为空时，观察名单是否始终为 false，输出是否明确“数据不足”。
-6. AC4/AC5 是否真正执行查询、删除重建、比较哈希并注入失败。
-7. 日期日末回填和不完整 revision lineage 是否被正确列为限制。
+5. Q2 是否完全由结构化证据规则计算；产品证据、未来证据和旧人工标签能否绕过上限。
+6. Q3 是否只验证可比较性；不同期间/单位、缺窗口/benchmark/估值或未来数据是否始终返回“数据不足”。
+7. `supply_chain_master.csv` 是否严格为 edge grain，并包含来源定位、归档和哈希。
+8. `build` 是否不改变数据库行数；只有 `init-seed` 会显式重建。
+9. AC4/AC5 是否真正执行查询、删除重建、比较哈希并注入失败。
+10. 日期日末回填和不完整 revision lineage 是否被正确列为限制。
 
-请将结论按 `P0 / P1 / P2` 输出，并为每项给出文件、证据、建议修复和验证方法。不要因为 18 个测试或 AC1—AC5 通过就推断已有可投资的预期差名单。
+请将结论按 `P0 / P1 / P2` 输出，并为每项给出文件、证据、建议修复和验证方法。不要因为 32 个测试、AC1—AC5 implementation checks 或 CI 通过就推断已有可投资的预期差名单。
+
+## GitHub Actions
+
+- Workflow：`research-ci`
+- Python：`3.12`
+- 研究输出 artifact：`research-output-2026-07-19`
+- 日志 artifact：`research-ci-logs`
+- 最终 MVP ACCEPTED 的前置条件：新 SHA 的 workflow 成功，且本次 domain review 无剩余阻断项。

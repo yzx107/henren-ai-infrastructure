@@ -34,37 +34,169 @@ class AcceptanceCheck:
     detail: str
 
 
+def _row_dicts(result) -> list[dict[str, object]]:
+    return [dict(zip(result.headers, row, strict=True)) for row in result.rows]
+
+
 def _ac4_failures(connection: duckdb.DuckDBPyConnection) -> list[str]:
     failures: list[str] = []
-    early = capex_beneficiaries(connection, "CLOUD_GOOG", date(2026, 2, 28))
-    if len(early.rows) != 1 or early.rows[0][3:5] != (1, "CHIP_NVDA"):
+    event_id = "CAPEX_GOOG_FY2026"
+    early = _row_dicts(capex_beneficiaries(connection, event_id, date(2026, 2, 28)))
+    if len(early) != 1 or early[0]["benefit_level"] != 1 \
+            or early[0]["beneficiary_company_id"] != "CHIP_NVDA":
         failures.append("as_of 未把早期结果限制为 NVIDIA 直接路径")
-    if any(row[10] > as_of_timestamp(date(2026, 2, 28)) for row in early.rows):
+    if any(row["relation_first_available_at"] > as_of_timestamp(date(2026, 2, 28)) for row in early):
         failures.append("早期 CapEx 查询泄漏未来关系")
-    if any(not row[9] or not row[12] or not row[13] for row in early.rows):
-        failures.append("CapEx 路径缺披露时间或来源")
+    capex_required = {
+        "event_id", "fiscal_period", "event_type", "guidance_low_millions",
+        "guidance_high_millions", "currency", "direction",
+        "event_first_available_at", "event_source_url",
+        "relation_disclosed_at", "relation_source_url",
+    }
+    if not early or not capex_required <= set(early[0]) \
+            or any(row["event_id"] != event_id for row in early):
+        failures.append("CapEx 路径未绑定指定 event_id 或缺事件/关系来源")
 
-    late = capex_beneficiaries(connection, "CLOUD_GOOG", date(2026, 7, 19))
-    direct = {row[4] for row in late.rows if row[3] == 1}
-    secondary = {row[4] for row in late.rows if row[3] == 2}
+    late = _row_dicts(capex_beneficiaries(connection, event_id, date(2026, 7, 19)))
+    direct = {row["beneficiary_company_id"] for row in late if row["benefit_level"] == 1}
+    secondary = {row["beneficiary_company_id"] for row in late if row["benefit_level"] == 2}
     if direct != {"CHIP_NVDA"}:
         failures.append(f"直接受益路径错误：{sorted(direct)}")
     if secondary != {"MEM_SKHYNIX", "OPT_COHERENT", "OPT_LUMENTUM"}:
         failures.append(f"二级受益路径错误：{sorted(secondary)}")
 
-    exposure = exposure_classification(connection, "CHIP_NVDA", date(2026, 7, 19))
-    if len(exposure.rows) != 1:
-        failures.append("收入暴露查询未返回唯一最新快照")
-    else:
-        row = exposure.rows[0]
-        if not row[3] or not row[4] or not row[9] or not row[10] or not row[11]:
-            failures.append("收入暴露分类缺证据、来源或披露时间")
-        if row[12] > as_of_timestamp(date(2026, 7, 19)):
-            failures.append("收入暴露查询泄漏未来快照")
+    no_evidence = _row_dicts(
+        exposure_classification(connection, "CHIP_INTC", date(2026, 7, 19))
+    )[0]
+    if no_evidence["classification"] != "待核验" or no_evidence["evidence_count"] != 0:
+        failures.append("无结构化收入证据时未返回待核验")
 
-    gap = expectation_gap(connection, date(2026, 7, 19), "US_NVDA")
-    if len(gap.rows) != 1 or gap.rows[0][-3] != "数据不足" or gap.rows[0][-2] is not False:
-        failures.append("缺预期/估值/价格时未返回数据不足或错误进入观察名单")
+    connection.execute("BEGIN")
+    try:
+        connection.execute(
+            """INSERT INTO company_exposure_evidence
+               (evidence_id, company_id, evidence_type, product, fiscal_period,
+                source_id, source_locator, first_available_at, ingested_at,
+                revision_id, confidence)
+               VALUES
+               ('AC4_PRODUCT', 'CHIP_NVDA', 'PRODUCT_ONLY', 'Blackwell', 'FY2027Q1',
+                'S_NVDA', 'fixed fixture: product section',
+                '2026-05-20T23:59:59+00:00', '2026-07-19T23:59:59+00:00', 'v1', 0.95),
+               ('AC4_FUTURE', 'CHIP_NVDA', 'DEPLOYMENT', 'Blackwell', 'FY2028',
+                'S_NVDA', 'fixed fixture: future deployment',
+                '2027-01-01T00:00:00+00:00', '2027-01-01T00:01:00+00:00', 'v1', 0.95)"""
+        )
+        exposure = _row_dicts(
+            exposure_classification(connection, "CHIP_NVDA", date(2026, 7, 19))
+        )[0]
+        if exposure["classification"] != "直接-低" \
+                or exposure["legacy_candidate_label"] != "直接-高":
+            failures.append("产品证据或旧人工标签骗过规则形成高暴露")
+        if exposure["evidence_types"] != "PRODUCT_ONLY" \
+                or not exposure["evidence_periods"] or not exposure["source_ids"] \
+                or not exposure["source_locators"] or not exposure["strongest_bear_case"]:
+            failures.append("规则分类未输出证据类型、期间、来源和最强反方")
+        if exposure["classification_cutoff"] > as_of_timestamp(date(2026, 7, 19)):
+            failures.append("未来收入暴露证据进入历史分类")
+    finally:
+        connection.execute("ROLLBACK")
+
+    gap = _row_dicts(expectation_gap(connection, date(2026, 7, 19), "US_NVDA"))[0]
+    if gap["assessment"] != "数据不足" or gap["is_watchlist"] is not False:
+        failures.append("空 Q3 数据合同未返回数据不足")
+
+    connection.execute("BEGIN")
+    try:
+        connection.execute(
+            """INSERT INTO fundamental_signals
+               (signal_id, company_id, snapshot_at, metric_name, metric_value,
+                metric_unit, fiscal_period, comparison_type, comparison_period,
+                actual_or_guidance, source_id, first_available_at, ingested_at, revision_id)
+               VALUES ('AC4_F', 'CHIP_NVDA', '2026-07-18T00:00:00+00:00',
+                       'REVENUE', 40.0, 'USD_BN', 'FY2027Q1', 'YOY', 'FY2026Q1',
+                       'ACTUAL', 'S_NVDA', '2026-07-18T00:00:00+00:00',
+                       '2026-07-18T00:01:00+00:00', 'v1')"""
+        )
+        connection.execute(
+            """INSERT INTO expectation_signals
+               (signal_id, security_id, snapshot_at, forecast_metric, forecast_period,
+                previous_snapshot_at, forecast_unit, current_value, previous_value, revision_pct,
+                consensus_source, source_id, first_available_at, ingested_at, revision_id)
+               VALUES ('AC4_E', 'US_NVDA', '2026-07-17T00:00:00+00:00',
+                       'REVENUE', 'FY2027Q1', '2026-06-17T00:00:00+00:00',
+                       'USD_BN', 39.0, 38.0, 0.026315789,
+                       'FIXED_FIXTURE', 'S_NVDA', '2026-07-17T00:00:00+00:00',
+                       '2026-07-17T00:01:00+00:00', 'v1')"""
+        )
+        connection.execute(
+            """INSERT INTO price_signals
+               (signal_id, security_id, snapshot_at, window_start, window_end,
+                return_type, raw_return, benchmark_return, excess_return,
+                benchmark_id, source_id, first_available_at, ingested_at, revision_id)
+               VALUES ('AC4_P', 'US_NVDA', '2026-07-18T00:00:00+00:00',
+                       '2026-07-01', '2026-07-18', 'TOTAL_RETURN', 0.08, 0.03, 0.05,
+                       'SP500', 'S_NVDA', '2026-07-18T00:00:00+00:00',
+                       '2026-07-18T00:01:00+00:00', 'v1')"""
+        )
+        connection.execute(
+            """INSERT INTO valuation_signals
+               (signal_id, security_id, snapshot_at, valuation_metric,
+                valuation_value, forward_period, historical_percentile,
+                source_id, first_available_at, ingested_at, revision_id)
+               VALUES ('AC4_V', 'US_NVDA', '2026-07-18T00:00:00+00:00',
+                       'FORWARD_PE', 25.0, 'FY2027Q1', 0.60, 'S_NVDA',
+                       '2026-07-18T00:00:00+00:00',
+                       '2026-07-18T00:01:00+00:00', 'v1')"""
+        )
+        complete = _row_dicts(expectation_gap(connection, date(2026, 7, 19), "US_NVDA"))[0]
+        required_output = {
+            "fundamental_snapshot_at", "fiscal_period", "metric_unit",
+            "expectation_snapshot_at", "expectation_previous_snapshot_at",
+            "forecast_period", "forecast_unit",
+            "window_start", "window_end", "benchmark_id", "valuation_metric",
+            "fundamental_source_url", "expectation_source_url",
+            "price_source_url", "valuation_source_url",
+        }
+        if complete["is_watchlist"] is not True or not required_output <= set(complete):
+            failures.append("完整同口径 Q3 fixture 未形成可比较候选或缺原始合同字段")
+
+        connection.execute("UPDATE expectation_signals SET forecast_period='FY2028Q1' WHERE signal_id='AC4_E'")
+        mismatch = _row_dicts(expectation_gap(connection, date(2026, 7, 19), "US_NVDA"))[0]
+        if mismatch["is_watchlist"] is not False:
+            failures.append("不同财务期间进入 Q3 候选")
+        connection.execute(
+            "UPDATE expectation_signals SET forecast_period='FY2027Q1', forecast_unit='PERCENT' WHERE signal_id='AC4_E'"
+        )
+        mismatch = _row_dicts(expectation_gap(connection, date(2026, 7, 19), "US_NVDA"))[0]
+        if mismatch["is_watchlist"] is not False:
+            failures.append("不同单位进入 Q3 候选")
+        connection.execute("UPDATE expectation_signals SET forecast_unit='USD_BN' WHERE signal_id='AC4_E'")
+        connection.execute(
+            "UPDATE fundamental_signals SET first_available_at='2027-01-01T00:00:00+00:00' WHERE signal_id='AC4_F'"
+        )
+        if _row_dicts(expectation_gap(connection, date(2026, 7, 19), "US_NVDA"))[0]["is_watchlist"] is not False:
+            failures.append("未来 Q3 数据进入历史候选")
+        connection.execute(
+            "UPDATE fundamental_signals SET first_available_at='2026-07-18T00:00:00+00:00' WHERE signal_id='AC4_F'"
+        )
+        connection.execute("DELETE FROM valuation_signals WHERE signal_id='AC4_V'")
+        if _row_dicts(expectation_gap(connection, date(2026, 7, 19), "US_NVDA"))[0]["is_watchlist"] is not False:
+            failures.append("缺估值时进入 Q3 候选")
+        connection.execute(
+            """INSERT INTO valuation_signals
+               (signal_id, security_id, snapshot_at, valuation_metric,
+                valuation_value, forward_period, historical_percentile,
+                source_id, first_available_at, ingested_at, revision_id)
+               VALUES ('AC4_V', 'US_NVDA', '2026-07-18T00:00:00+00:00',
+                       'FORWARD_PE', 25.0, 'FY2027Q1', 0.60, 'S_NVDA',
+                       '2026-07-18T00:00:00+00:00',
+                       '2026-07-18T00:01:00+00:00', 'v1')"""
+        )
+        connection.execute("DELETE FROM price_signals WHERE signal_id='AC4_P'")
+        if _row_dicts(expectation_gap(connection, date(2026, 7, 19), "US_NVDA"))[0]["is_watchlist"] is not False:
+            failures.append("缺收益窗口或 benchmark 时进入 Q3 候选")
+    finally:
+        connection.execute("ROLLBACK")
     return failures
 
 
@@ -137,6 +269,12 @@ def _ac5_failures(
         checks = set(report.get("contract_checks", {}))
         if not REQUIRED_DQA_CHECKS <= checks:
             failures.append("DQA JSON 缺合同检查项")
+        with (first_dir / "supply_chain_master.csv").open(
+            encoding="utf-8", newline=""
+        ) as handle:
+            supply_rows = list(csv.DictReader(handle))
+        if len(supply_rows) != 10 or len({row.get("edge_id") for row in supply_rows}) != 10:
+            failures.append("supply_chain_master 不是 10 条唯一 edge-level 关系")
 
         shutil.rmtree(first_dir)
         try:

@@ -29,6 +29,7 @@ REQUIRED_DQA_CHECKS = {
     "future_dates",
     "currency_market_rules",
     "relation_trace_sample",
+    "research_data_contracts",
 }
 
 
@@ -59,13 +60,30 @@ def _supply_chain_master(
 ) -> QueryResult:
     return _query(
         connection,
-        """SELECT company, security_code, market, industry_layer, core_product,
-                  major_customers, ai_revenue_exposure, exposure_basis,
-                  relationship_source, disclosed_at, first_available_at, revision_id,
-                  current_thesis, strongest_bear_case, confidence
-           FROM initial_universe_as_of(?)
-           ORDER BY industry_layer, company""",
-        [cutoff],
+        """SELECT e.edge_id,
+                  e.source_company_id, source_company.company_name AS source_company_name,
+                  source_company.industry_layer AS source_industry_layer,
+                  e.relation_type,
+                  e.target_company_id, target_company.company_name AS target_company_name,
+                  target_company.industry_layer AS target_industry_layer,
+                  e.product, e.valid_from, e.valid_to, e.disclosed_at,
+                  e.first_available_at, e.revision_id, e.economic_exposure,
+                  e.confidence, e.source_id, s.url AS source_url,
+                  evidence.source_locator, evidence.archived_path,
+                  evidence.content_sha256, evidence.auditor_result
+           FROM supply_chain_edges e
+           JOIN company_master source_company ON source_company.company_id=e.source_company_id
+           JOIN company_master target_company ON target_company.company_id=e.target_company_id
+           JOIN sources s USING (source_id)
+           JOIN source_evidence evidence USING (edge_id, source_id)
+           WHERE e.first_available_at <= ?
+             AND e.valid_from <= CAST(? AS DATE)
+             AND (e.valid_to IS NULL OR e.valid_to >= CAST(? AS DATE))
+             AND (e.superseded_at IS NULL OR e.superseded_at > ?)
+             AND s.first_available_at <= ?
+             AND (s.superseded_at IS NULL OR s.superseded_at > ?)
+           ORDER BY e.edge_id""",
+        [cutoff, cutoff, cutoff, cutoff, cutoff, cutoff],
     )
 
 
@@ -112,10 +130,12 @@ def _profit_transmission(
                ) = 1
            )
            SELECT c.company_id, c.company_name, c.industry_layer,
-                  f.metric_name, f.metric_change, f.snapshot_at,
+                  f.metric_name, f.metric_value, f.metric_unit, f.fiscal_period,
+                  f.comparison_type, f.comparison_period, f.actual_or_guidance,
+                  f.snapshot_at,
                   f.first_available_at AS data_cutoff, f.revision_id, f.source_id,
                   s.url AS source_url,
-                  CASE WHEN f.metric_change IS NULL THEN '数据不足' ELSE '有经营数据' END AS data_status
+                  CASE WHEN f.metric_value IS NULL THEN '数据不足' ELSE '有经营数据' END AS data_status
            FROM company_master c
            LEFT JOIN latest_fundamental f USING (company_id)
            LEFT JOIN sources s ON s.source_id=f.source_id
@@ -134,6 +154,11 @@ def _duplicates(connection: duckdb.DuckDBPyConnection) -> dict[str, int]:
         "supply_chain_edges": "edge_id",
         "source_evidence": "evidence_id",
         "capex_events": "event_id",
+        "company_exposure_evidence": "evidence_id",
+        "fundamental_signals": "signal_id",
+        "expectation_signals": "signal_id",
+        "price_signals": "signal_id",
+        "valuation_signals": "signal_id",
     }
     return {
         table: connection.execute(
@@ -151,7 +176,8 @@ def _dqa_payload(
     tables = [
         "company_master", "security_master", "sources", "company_research_snapshot",
         "supply_chain_edges", "source_evidence", "capex_events",
-        "fundamental_signals", "expectation_signals", "price_signals",
+        "company_exposure_evidence", "fundamental_signals",
+        "expectation_signals", "price_signals", "valuation_signals",
     ]
     row_counts = {
         table: connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
@@ -168,6 +194,16 @@ def _dqa_payload(
         "edges": connection.execute(
             "SELECT count(*) FROM supply_chain_edges WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL"
         ).fetchone()[0],
+        "exposure_evidence": connection.execute(
+            "SELECT count(*) FROM company_exposure_evidence WHERE source_locator IS NULL OR first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL"
+        ).fetchone()[0],
+        "signals": connection.execute(
+            """SELECT
+                 (SELECT count(*) FROM fundamental_signals WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL)
+               + (SELECT count(*) FROM expectation_signals WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL)
+               + (SELECT count(*) FROM price_signals WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL)
+               + (SELECT count(*) FROM valuation_signals WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL)"""
+        ).fetchone()[0],
     }
     orphan_references = {
         "securities": connection.execute(
@@ -179,14 +215,37 @@ def _dqa_payload(
                   OR NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=e.target_company_id)
                   OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=e.source_id)"""
         ).fetchone()[0],
+        "research_facts": connection.execute(
+            """SELECT
+                 (SELECT count(*) FROM company_exposure_evidence e
+                   WHERE NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=e.company_id)
+                      OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=e.source_id))
+               + (SELECT count(*) FROM fundamental_signals f
+                   WHERE NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=f.company_id)
+                      OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=f.source_id))
+               + (SELECT count(*) FROM expectation_signals e
+                   WHERE NOT EXISTS (SELECT 1 FROM security_master x WHERE x.security_id=e.security_id)
+                      OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=e.source_id))
+               + (SELECT count(*) FROM price_signals p
+                   WHERE NOT EXISTS (SELECT 1 FROM security_master x WHERE x.security_id=p.security_id)
+                      OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=p.source_id))
+               + (SELECT count(*) FROM valuation_signals v
+                   WHERE NOT EXISTS (SELECT 1 FROM security_master x WHERE x.security_id=v.security_id)
+                      OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=v.source_id))"""
+        ).fetchone()[0],
     }
     future_dates = {
         "stored_after_as_of": connection.execute(
             """SELECT
                  (SELECT count(*) FROM company_research_snapshot WHERE first_available_at > ?)
                + (SELECT count(*) FROM supply_chain_edges WHERE first_available_at > ?)
-               + (SELECT count(*) FROM capex_events WHERE first_available_at > ?)""",
-            [cutoff, cutoff, cutoff],
+               + (SELECT count(*) FROM capex_events WHERE first_available_at > ?)
+               + (SELECT count(*) FROM company_exposure_evidence WHERE first_available_at > ?)
+               + (SELECT count(*) FROM fundamental_signals WHERE first_available_at > ?)
+               + (SELECT count(*) FROM expectation_signals WHERE first_available_at > ?)
+               + (SELECT count(*) FROM price_signals WHERE first_available_at > ?)
+               + (SELECT count(*) FROM valuation_signals WHERE first_available_at > ?)""",
+            [cutoff] * 8,
         ).fetchone()[0],
         "output_leakage": 0,
     }
@@ -199,6 +258,25 @@ def _dqa_payload(
     )
     trace_rows = sample_trace_rows(connection)
     archive_errors = evidence_failures(connection)
+    research_contract_errors = connection.execute(
+        """SELECT
+             (SELECT count(*) FROM company_exposure_evidence
+               WHERE evidence_type NOT IN (
+                 'REVENUE','REVENUE_SHARE','ORDER','BACKLOG','NAMED_CUSTOMER',
+                 'SHIPMENT','DEPLOYMENT','PRODUCT_ONLY','MANAGEMENT_STATEMENT',
+                 'INDIRECT_INDUSTRY_EXPOSURE'
+               ) OR source_locator IS NULL OR trim(source_locator)=''
+                 OR confidence NOT BETWEEN 0 AND 1)
+           + (SELECT count(*) FROM expectation_signals
+               WHERE previous_snapshot_at IS NULL OR previous_snapshot_at >= snapshot_at)
+           + (SELECT count(*) FROM price_signals
+               WHERE window_start IS NULL OR window_end IS NULL OR window_start > window_end
+                  OR benchmark_id IS NULL
+                  OR abs(excess_return - (raw_return - benchmark_return)) > 0.000001)
+           + (SELECT count(*) FROM valuation_signals
+               WHERE historical_percentile IS NULL
+                  OR historical_percentile NOT BETWEEN 0 AND 1)"""
+    ).fetchone()[0]
     return {
         "as_of_date": as_of_date(cutoff).isoformat(),
         "status": "PASS",
@@ -209,6 +287,7 @@ def _dqa_payload(
             "orphan_references": {"total": sum(orphan_references.values()), "by_table": orphan_references},
             "future_dates": future_dates,
             "currency_market_rules": {"errors": currency_errors},
+            "research_data_contracts": {"errors": research_contract_errors},
             "relation_trace_sample": {
                 "seed": "mvp-v1",
                 "sample_count": len(trace_rows),
@@ -235,16 +314,37 @@ def validate_built_outputs(output_dir: Path, cutoff: datetime) -> None:
         if not rows:
             raise BuildError(f"只有表头的输出：{name}")
         for row in rows:
-            for field in ("first_available_at", "data_cutoff"):
-                value = row.get(field)
-                if value and datetime.fromisoformat(value).astimezone(cutoff.tzinfo) > cutoff:
+            for field, value in row.items():
+                if not value or not (
+                    field == "data_cutoff"
+                    or field == "first_available_at"
+                    or field.endswith("_first_available_at")
+                ):
+                    continue
+                if datetime.fromisoformat(value).astimezone(cutoff.tzinfo) > cutoff:
                     raise BuildError(f"未来数据泄漏：{name}:{field}={value}")
+    supply_path = output_dir / "supply_chain_master.csv"
+    with supply_path.open(encoding="utf-8", newline="") as handle:
+        supply_rows = list(csv.DictReader(handle))
+    required_edge_fields = {
+        "edge_id", "source_company_id", "target_company_id", "relation_type",
+        "source_id", "source_url", "source_locator", "archived_path",
+        "content_sha256", "auditor_result",
+    }
+    if not supply_rows or not required_edge_fields <= set(supply_rows[0]):
+        raise BuildError("supply_chain_master 不是 edge-level 可追溯关系表")
+    if any(not row["edge_id"] for row in supply_rows):
+        raise BuildError("supply_chain_master 存在空 edge_id")
+    if len({row["edge_id"] for row in supply_rows}) != len(supply_rows):
+        raise BuildError("supply_chain_master 存在重复 edge_id")
     report = json.loads((output_dir / "data_quality_report.json").read_text(encoding="utf-8"))
     checks = report.get("contract_checks", {})
     if not REQUIRED_DQA_CHECKS <= set(checks):
         raise BuildError(f"DQA 报告缺少合同检查：{sorted(REQUIRED_DQA_CHECKS - set(checks))}")
     if report.get("status") != "PASS":
         raise BuildError("DQA 报告非 PASS")
+    if checks.get("research_data_contracts", {}).get("errors") != 0:
+        raise BuildError("DQA 研究数据合同非 PASS")
 
 
 def build_outputs(

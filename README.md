@@ -8,7 +8,7 @@
 
 首版截至 **2026-07-19**，只覆盖 30 家公司和四层：云厂商、GPU/ASIC、HBM 与先进封装、网络与光互联。A/H/US 是主要研究市场，同时保留 TSMC、SK hynix、Samsung、IBIDEN 等不可省略的全球核心节点。
 
-第一版范围和完成定义已经冻结在 [MVP 验收合同](docs/MVP_ACCEPTANCE.md)。截至 `2026-07-19`，五项执行型验收均通过；这表示 PIT 查询和可重复输出合同成立，不表示数据已经支持“尚未充分定价”结论。
+第一版范围和完成定义已经冻结在 [MVP 验收合同](docs/MVP_ACCEPTANCE.md)。当前状态为 **AC1—AC3 PASS；AC4—AC5 IMPLEMENTED, DOMAIN REVIEW PENDING**。在 GitHub CI 和 domain review 完成前，不宣称最终 MVP ACCEPTED。
 
 ## 已完成的最小闭环
 
@@ -26,7 +26,7 @@
 ```bash
 cd "/Volumes/Data/Henren Investment System/ai_infrastructure_graph"
 uv sync
-uv run ai-chain init
+uv run ai-chain init-seed
 uv run ai-chain check --as-of 2026-07-19
 uv run ai-chain build --as-of 2026-07-19
 uv run ai-chain summary --as-of 2026-07-19
@@ -52,8 +52,9 @@ uv run pytest -q
 | `source_evidence` | 关系对应的原始披露定位、归档路径、哈希和人工审计结论 |
 | `hypotheses` | 机制、最强反方、证伪条件和状态 |
 | `company_exposures` | 五项 0—5 分的人工/模型评分输入 |
+| `company_exposure_evidence` | Q2 结构化收入、订单、客户、交付和产品证据；规则分类的唯一事实输入 |
 | `capex_events` | 云厂商 CapEx 事件及 PIT 字段 |
-| `fundamental_signals` / `expectation_signals` / `price_signals` | 利润传导和预期差输入；当前允许为空 |
+| `fundamental_signals` / `expectation_signals` / `price_signals` / `valuation_signals` | Q3 同期间、同单位、明确窗口的可比较性输入；种子当前为空 |
 | `initial_universe_as_of(cutoff)` | 每家公司截至 cutoff 最新的一条有效研究快照 |
 | `opportunity_scores_as_of(cutoff)` | 只对 cutoff 前五项评分齐全的记录计算分数 |
 
@@ -72,10 +73,10 @@ uv run pytest -q
 ## 研究边界
 
 - `主要客户` 只写公司公开披露的名称；否则写客户类型。
-- `AI收入暴露` 是证据等级，不是假装精确的收入百分比。
+- `company_research_snapshot.ai_revenue_exposure` 只是旧研究候选标签；最终分类必须由 `company_exposure_evidence` 规则计算。
 - 产品发布、客户认证、订单、交付、收入确认是不同事件，不能互相替代。
 - 公司 IR 是一手来源，但仍带管理层选择性披露偏差。
-- 当前一致预期、估值和价格种子为空，因此观察名单只会返回“数据不足”，不会制造“尚未充分定价”标的。
+- 当前财务、预期、估值和价格种子为空，因此 Q3 只返回“数据不足”。完整 fixture 也只产生“可比较候选（非投资结论）”，不会自动判断低估。
 - 这里的 `candidate` 假设和空评分不进入交易或风险承担流程。
 
 本轮仍严格冻结为 30 家、四层、10 条关系；后续扩范围必须由用户另行授权。

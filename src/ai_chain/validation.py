@@ -10,6 +10,11 @@ from .audit import evidence_failures
 ALLOWED_LAYERS = {"云厂商", "GPU/ASIC", "HBM与先进封装", "网络与光互联"}
 ALLOWED_EXPOSURES = {"直接-高", "直接-中", "直接-低", "间接", "待核验"}
 MARKET_CURRENCIES = {"A": "CNY", "H": "HKD", "US": "USD"}
+ALLOWED_EVIDENCE_TYPES = {
+    "REVENUE", "REVENUE_SHARE", "ORDER", "BACKLOG", "NAMED_CUSTOMER",
+    "SHIPMENT", "DEPLOYMENT", "PRODUCT_ONLY", "MANAGEMENT_STATEMENT",
+    "INDIRECT_INDUSTRY_EXPOSURE",
+}
 
 
 def validate(connection: duckdb.DuckDBPyConnection, as_of: date) -> list[str]:
@@ -78,6 +83,26 @@ def validate(connection: duckdb.DuckDBPyConnection, as_of: date) -> list[str]:
            UNION ALL
            SELECT edge_id FROM supply_chain_edges
            WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at
+           UNION ALL
+           SELECT evidence_id FROM company_exposure_evidence
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at
+           UNION ALL
+           SELECT signal_id FROM fundamental_signals
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at
+           UNION ALL
+           SELECT signal_id FROM expectation_signals
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at
+           UNION ALL
+           SELECT signal_id FROM price_signals
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at
+           UNION ALL
+           SELECT signal_id FROM valuation_signals
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
               OR first_available_at > ingested_at"""
     ).fetchall()
     if missing_temporal:
@@ -106,6 +131,25 @@ def validate(connection: duckdb.DuckDBPyConnection, as_of: date) -> list[str]:
     }
     if not exposures <= ALLOWED_EXPOSURES:
         issues.append(f"AI 收入暴露枚举异常：{sorted(exposures - ALLOWED_EXPOSURES)}")
+
+    evidence_types = {
+        row[0]
+        for row in connection.execute(
+            "SELECT DISTINCT evidence_type FROM company_exposure_evidence"
+        ).fetchall()
+    }
+    if not evidence_types <= ALLOWED_EVIDENCE_TYPES:
+        issues.append(f"收入暴露证据枚举异常：{sorted(evidence_types - ALLOWED_EVIDENCE_TYPES)}")
+
+    invalid_evidence = connection.execute(
+        """SELECT evidence_id FROM company_exposure_evidence
+           WHERE source_locator IS NULL OR trim(source_locator)=''
+              OR confidence NOT BETWEEN 0 AND 1
+              OR (evidence_start IS NOT NULL AND evidence_end IS NOT NULL
+                  AND evidence_start > evidence_end)"""
+    ).fetchall()
+    if invalid_evidence:
+        issues.append(f"收入暴露证据合同异常：{[row[0] for row in invalid_evidence]}")
 
     orphan_edges = connection.execute(
         """SELECT edge_id FROM supply_chain_edges e
@@ -152,12 +196,47 @@ def validate(connection: duckdb.DuckDBPyConnection, as_of: date) -> list[str]:
            UNION ALL
            SELECT signal_id FROM expectation_signals e
            WHERE NOT EXISTS (SELECT 1 FROM security_master s WHERE s.security_id=e.security_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=e.source_id)
            UNION ALL
            SELECT signal_id FROM price_signals p
-           WHERE NOT EXISTS (SELECT 1 FROM security_master s WHERE s.security_id=p.security_id)"""
+           WHERE NOT EXISTS (SELECT 1 FROM security_master s WHERE s.security_id=p.security_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=p.source_id)
+           UNION ALL
+           SELECT signal_id FROM valuation_signals v
+           WHERE NOT EXISTS (SELECT 1 FROM security_master s WHERE s.security_id=v.security_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=v.source_id)
+           UNION ALL
+           SELECT evidence_id FROM company_exposure_evidence e
+           WHERE NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=e.company_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=e.source_id)"""
     ).fetchall()
     if orphan_research_facts:
         issues.append(f"研究事实存在孤儿引用：{[row[0] for row in orphan_research_facts]}")
+
+    invalid_signal_contracts = connection.execute(
+        """SELECT signal_id FROM fundamental_signals
+           WHERE metric_name IS NULL OR metric_value IS NULL OR metric_unit IS NULL
+              OR fiscal_period IS NULL OR comparison_type IS NULL
+              OR comparison_period IS NULL OR actual_or_guidance IS NULL
+           UNION ALL
+           SELECT signal_id FROM expectation_signals
+           WHERE previous_snapshot_at IS NULL OR previous_snapshot_at >= snapshot_at
+              OR forecast_metric IS NULL OR forecast_period IS NULL OR forecast_unit IS NULL
+              OR current_value IS NULL OR previous_value IS NULL OR revision_pct IS NULL
+              OR consensus_source IS NULL
+           UNION ALL
+           SELECT signal_id FROM price_signals
+           WHERE window_start IS NULL OR window_end IS NULL OR window_start > window_end
+              OR return_type IS NULL OR raw_return IS NULL OR benchmark_return IS NULL
+              OR excess_return IS NULL OR benchmark_id IS NULL
+              OR abs(excess_return - (raw_return - benchmark_return)) > 0.000001
+           UNION ALL
+           SELECT signal_id FROM valuation_signals
+           WHERE valuation_metric IS NULL OR valuation_value IS NULL OR forward_period IS NULL
+              OR historical_percentile IS NULL OR historical_percentile NOT BETWEEN 0 AND 1"""
+    ).fetchall()
+    if invalid_signal_contracts:
+        issues.append(f"Q3 数据合同异常：{[row[0] for row in invalid_signal_contracts]}")
 
     archive_issues = evidence_failures(connection)
     if archive_issues:
