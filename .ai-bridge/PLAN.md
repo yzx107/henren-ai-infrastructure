@@ -37,9 +37,9 @@ data/seed/*.csv + data/sources/archive/*
         ↓
 src/ai_chain/db.py → runtime/ai_chain.duckdb
         ↓
-schema 表 / initial_universe / opportunity_scores
+schema 表 / parameterized as-of macros
         ↓
-CLI DQA、关系审计、验收合同、研究输出
+PIT 研究查询 / CLI DQA / 统一 build / 验收合同
 ```
 
 CSV 是可审计源层；DuckDB 是本地查询层。供应链关系通过 `source_evidence` 连接到原始披露定位、本地归档和 SHA-256。
@@ -49,8 +49,8 @@ CSV 是可审计源层；DuckDB 是本地查询层。供应链关系通过 `sour
 1. `ai-chain init` 从种子 CSV 重建 DuckDB。
 2. `ai-chain check` 检查范围、映射、日期、来源、置信度、孤儿引用和归档哈希。
 3. `ai-chain trace-audit` 用固定种子 `mvp-v1` 生成 10 条关系抽查。
-4. `ai-chain acceptance` 按五项冻结合同返回验收状态。
-5. AC4/AC5 完成后，才允许生成完整研究输出并讨论扩层。
+4. `ai-chain build --as-of YYYY-MM-DD` 生成五个确定性研究输出。
+5. `ai-chain acceptance --as-of YYYY-MM-DD` 实际执行三类查询、重建和失败注入。
 
 ## 主要模块
 
@@ -58,12 +58,15 @@ CSV 是可审计源层；DuckDB 是本地查询层。供应链关系通过 `sour
 |---|---|
 | `sql/schema.sql` | 表和视图定义 |
 | `src/ai_chain/db.py` | CSV 载入与 DuckDB 初始化 |
+| `src/ai_chain/as_of.py` | cutoff 标准化 |
+| `src/ai_chain/research.py` | CapEx、收入暴露和预期差 PIT 查询 |
+| `src/ai_chain/build.py` | 五输出确定性构建与内容校验 |
 | `src/ai_chain/validation.py` | 数据质量闸门 |
 | `src/ai_chain/audit.py` | 关系抽样、归档与哈希校验 |
 | `src/ai_chain/acceptance.py` | 五项 MVP 验收合同 |
 | `src/ai_chain/cli.py` | 命令行入口 |
-| `tests/test_project.py` | 公式、范围、DQA、审计回归测试 |
+| `tests/test_project.py` | PIT、失败注入、范围、DQA 和审计回归测试 |
 
 ## 下一步边界
 
-下一步只能消除 AC4 和 AC5 的阻断项。进入实现前，应由投资负责人和 reviewer 先回答 `QUESTIONS.md` 中的数据语义与投资定义问题。
+当前 P0 只进入 code/data/research-logic review，不扩公司、层级、模型或界面。`QUESTIONS.md` 中未解决的投资定义和数据语义仍需投资负责人决定。

@@ -12,16 +12,16 @@
 
 ## 数据语义
 
-1. 是否新增 `first_available_at TIMESTAMPTZ`，并保留 `disclosed_at DATE` 作为自然日？
+1. 已解决：新增 `first_available_at TIMESTAMPTZ`，并保留 `disclosed_at DATE` 作为自然日；旧数据按 UTC 日末保守回填，不支持日内研究。
 2. `valid_from` 应统一表示法律协议生效、商业交付开始、产品量产，还是关系在研究模型中生效？是否需要独立字段？
-3. 来源后来修订时，是覆盖原记录还是保存 immutable version 与 `superseded_at`？
+3. 部分解决：schema 已保存 `revision_id` 与 `superseded_at`，但完整 immutable revision 摄取工作流仍待后续授权。
 4. `economic_exposure` 目前是文字；下一版是否要求币值、数量、容量、收入占比及单位？
 5. 财务期末、公告时间、供应商到达时间和入库时间应如何分别命名？
 
 ## 未来函数风险
 
-1. 历史查询是否强制所有表使用 `first_available_at <= as_of`，而不仅是供应链关系？
-2. 2026 年披露的关系不得回填至更早的事件研究；查询层还是构建层负责阻断？
+1. 已解决：当前所有研究查询入口使用 `first_available_at <= as_of` 和 `superseded_at` 边界。
+2. 已解决：查询层过滤，构建层和输出校验再做失败闸门。
 3. 一致预期数据是否能取得历史快照，还是只能取得当前共识？没有历史快照时不得回测。
 4. 财务数据修订、公司更名、证券退市和并购映射如何保留历史版本？
 5. 初始 30 家是事后选择的当代核心公司，未来回测如何处理节点选择偏差和幸存者偏差？
@@ -37,6 +37,6 @@
 ## 工程与验收
 
 1. 已解决：使用独立公开仓库 `yzx107/henren-ai-infrastructure`；历史从首次发布提交开始。
-2. AC5 的单一构建命令应使用 Python CLI 子命令还是 Makefile；当前项目倾向保持一个 Python CLI。
+2. 已解决：AC5 使用单一 Python CLI 子命令 `ai-chain build --as-of YYYY-MM-DD`，不增加 Makefile。
 3. 数据源断网或付费数据不可用时，pipeline 应失败，还是允许带明确降级状态生成部分输出？
 4. DQA 报告中的 warning 是否阻断整次构建，还是只有 error 阻断？需要先冻结严重度定义。

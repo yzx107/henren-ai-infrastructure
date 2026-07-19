@@ -67,6 +67,22 @@ def validate(connection: duckdb.DuckDBPyConnection, as_of: date) -> list[str]:
     if bad_sources:
         issues.append(f"来源 URL 或日期异常：{[row[0] for row in bad_sources]}")
 
+    missing_temporal = connection.execute(
+        """SELECT source_id FROM sources
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at
+           UNION ALL
+           SELECT company_id FROM company_research_snapshot
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at
+           UNION ALL
+           SELECT edge_id FROM supply_chain_edges
+           WHERE first_available_at IS NULL OR ingested_at IS NULL OR revision_id IS NULL
+              OR first_available_at > ingested_at"""
+    ).fetchall()
+    if missing_temporal:
+        issues.append(f"PIT 字段缺失或时间倒置：{[row[0] for row in missing_temporal]}")
+
     future_rows = connection.execute(
         """SELECT company_id FROM company_research_snapshot WHERE as_of_date > ?
            UNION ALL SELECT source_id FROM sources WHERE disclosed_at > ?""",
@@ -124,6 +140,24 @@ def validate(connection: duckdb.DuckDBPyConnection, as_of: date) -> list[str]:
     ).fetchall()
     if orphan_evidence:
         issues.append(f"来源证据引用或哈希异常：{[row[0] for row in orphan_evidence]}")
+
+    orphan_research_facts = connection.execute(
+        """SELECT event_id FROM capex_events e
+           WHERE NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=e.company_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=e.source_id)
+           UNION ALL
+           SELECT signal_id FROM fundamental_signals f
+           WHERE NOT EXISTS (SELECT 1 FROM company_master c WHERE c.company_id=f.company_id)
+              OR NOT EXISTS (SELECT 1 FROM sources s WHERE s.source_id=f.source_id)
+           UNION ALL
+           SELECT signal_id FROM expectation_signals e
+           WHERE NOT EXISTS (SELECT 1 FROM security_master s WHERE s.security_id=e.security_id)
+           UNION ALL
+           SELECT signal_id FROM price_signals p
+           WHERE NOT EXISTS (SELECT 1 FROM security_master s WHERE s.security_id=p.security_id)"""
+    ).fetchall()
+    if orphan_research_facts:
+        issues.append(f"研究事实存在孤儿引用：{[row[0] for row in orphan_research_facts]}")
 
     archive_issues = evidence_failures(connection)
     if archive_issues:
