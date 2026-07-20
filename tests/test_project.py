@@ -109,3 +109,65 @@ def test_trace_audit_rejects_hash_mismatch(tmp_path: Path) -> None:
         assert not assess(connection, tmp_path / "outputs")[1].passed
     finally:
         connection.close()
+
+
+def test_dqa_fails_when_trace_sample_is_not_complete(tmp_path: Path) -> None:
+    db_path = tmp_path / "trace-count.duckdb"
+    initialize(db_path)
+    connection = duckdb.connect(str(db_path))
+    try:
+        connection.execute("DELETE FROM supply_chain_edges WHERE edge_id='E_GOOG_NVDA'")
+        issues = validate(connection, date(2026, 7, 19))
+        assert any("sample=9/10" in issue for issue in issues)
+    finally:
+        connection.close()
+
+
+def test_dqa_fails_when_blocking_gate_fails(tmp_path: Path) -> None:
+    db_path = tmp_path / "blocking.duckdb"
+    initialize(db_path)
+    connection = duckdb.connect(str(db_path))
+    try:
+        connection.execute(
+            """INSERT INTO company_exposures
+               (company_id, as_of_date, capex_exposure, source_id)
+               VALUES ('CHIP_AMD', '2026-07-19', 5, 'S_AMD')"""
+        )
+        # Force the downstream ranking to be unsafe so DQA proves the blocking gate is enforced.
+        connection.execute(
+            """CREATE OR REPLACE VIEW opportunity_scores AS
+               SELECT company_id, NULL AS company_name, NULL AS industry_layer, as_of_date,
+                      0 AS opportunity_score, confidence, analyst_note
+               FROM company_exposures"""
+        )
+        issues = validate(connection, date(2026, 7, 19))
+        assert any("硬闸门校验失败" in issue and "五项评分不全却进入排名" in issue for issue in issues)
+    finally:
+        connection.close()
+
+
+def test_research_outputs_do_not_include_future_windows(tmp_path: Path) -> None:
+    db_path = tmp_path / "future-output.duckdb"
+    initialize(db_path)
+    connection = duckdb.connect(str(db_path))
+    try:
+        connection.execute(
+            """INSERT INTO company_research_snapshot
+               VALUES ('CHIP_NVDA', '2099-01-01', 'future product', 'future customers',
+                       '直接-高', 'future basis', 'future thesis', 'future bear', 'S_NVDA', 0.9)"""
+        )
+        row = connection.execute(
+            "SELECT core_product, as_of_date FROM initial_universe WHERE company='NVIDIA'"
+        ).fetchone()
+        assert row[0] != "future product"
+        assert row[1] <= date.today()
+
+        connection.execute(
+            """INSERT INTO company_exposures
+               VALUES ('CHIP_NVDA', '2099-01-01', 5, 5, 5, 5, 0, 0.9, 'S_NVDA', 'future score')"""
+        )
+        assert connection.execute(
+            "SELECT count(*) FROM opportunity_scores WHERE as_of_date > current_date"
+        ).fetchone()[0] == 0
+    finally:
+        connection.close()
