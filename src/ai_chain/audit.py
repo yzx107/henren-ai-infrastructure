@@ -27,8 +27,9 @@ def sample_trace_rows(
         ).fetchall()
     ]
     if len(edge_ids) < sample_size:
-        return []
-    selected = random.Random(seed).sample(edge_ids, sample_size)
+        selected = edge_ids
+    else:
+        selected = random.Random(seed).sample(edge_ids, sample_size)
     rows = connection.execute(
         """SELECT e.edge_id, sc.company_name, e.relation_type, tc.company_name,
                   e.product, e.source_id, s.url, e.disclosed_at, e.valid_from,

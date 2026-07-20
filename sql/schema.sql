@@ -95,6 +95,12 @@ CREATE TABLE IF NOT EXISTS company_exposures (
 );
 
 CREATE OR REPLACE VIEW opportunity_scores AS
+WITH latest_exposures AS (
+    SELECT *
+    FROM company_exposures
+    WHERE as_of_date <= current_date
+    QUALIFY row_number() OVER (PARTITION BY company_id ORDER BY as_of_date DESC) = 1
+)
 SELECT
     e.company_id,
     c.company_name,
@@ -107,7 +113,7 @@ SELECT
       - 0.15 * e.priced_in AS opportunity_score,
     e.confidence,
     e.analyst_note
-FROM company_exposures e
+FROM latest_exposures e
 JOIN company_master c USING (company_id)
 WHERE e.capex_exposure IS NOT NULL
   AND e.bottleneck IS NOT NULL
@@ -116,6 +122,14 @@ WHERE e.capex_exposure IS NOT NULL
   AND e.priced_in IS NOT NULL;
 
 CREATE OR REPLACE VIEW initial_universe AS
+WITH latest_research AS (
+    SELECT r.*
+    FROM company_research_snapshot r
+    JOIN sources src USING (source_id)
+    WHERE r.as_of_date <= current_date
+      AND src.disclosed_at <= current_date
+    QUALIFY row_number() OVER (PARTITION BY r.company_id ORDER BY r.as_of_date DESC) = 1
+)
 SELECT
     c.company_name AS company,
     string_agg(s.ticker, ' / ' ORDER BY s.is_primary DESC, s.market) AS security_code,
@@ -126,11 +140,12 @@ SELECT
     r.ai_revenue_exposure,
     src.url AS relationship_source,
     src.disclosed_at,
+    r.as_of_date,
     r.current_thesis,
     r.strongest_bear_case,
     r.confidence
 FROM company_master c
 JOIN security_master s USING (company_id)
-JOIN company_research_snapshot r USING (company_id)
+JOIN latest_research r USING (company_id)
 JOIN sources src USING (source_id)
 GROUP BY ALL;
